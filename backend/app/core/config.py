@@ -18,6 +18,17 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
 
+    # SMTP (email-уведомления о лидах)
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+
+    # Агентский кабинет
+    AGENT_EMAIL: str = "admin@localhost"
+    AGENT_PASSWORD: str = "changeme"
+
     BASE_DOMAIN: str = "localhost"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True

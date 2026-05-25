@@ -15,13 +15,16 @@ import LeadsTab from './tabs/LeadsTab';
 import KnowledgeTab from './tabs/KnowledgeTab';
 import SettingsTab from './tabs/SettingsTab';
 import ConversationsTab from './tabs/ConversationsTab';
+import MarketingTab from './tabs/MarketingTab';
+import { TrendingUp } from 'lucide-react';
 
 const TABS = [
-  { id: 'overview', label: 'Обзор', icon: BarChart3 },
-  { id: 'leads', label: 'Лиды', icon: UserCheck },
-  { id: 'conversations', label: 'Диалоги', icon: MessageSquare },
-  { id: 'knowledge', label: 'База знаний', icon: Database },
-  { id: 'settings', label: 'Настройки', icon: Settings },
+  { id: 'overview',     label: 'Обзор',           icon: BarChart3   },
+  { id: 'leads',        label: 'Лиды',             icon: UserCheck   },
+  { id: 'conversations',label: 'Диалоги',          icon: MessageSquare },
+  { id: 'knowledge',    label: 'База знаний',       icon: Database    },
+  { id: 'marketing',    label: 'Маркетолог',        icon: TrendingUp  },
+  { id: 'settings',     label: 'Настройки',         icon: Settings    },
 ] as const;
 
 type Tab = typeof TABS[number]['id'];
@@ -208,6 +211,7 @@ export default function ClientDetailPage({ clientId }: { clientId: string }) {
         {activeTab === 'leads' && <LeadsTab clientId={clientId} />}
         {activeTab === 'conversations' && <ConversationsTab clientId={clientId} />}
         {activeTab === 'knowledge' && <KnowledgeTab clientId={clientId} />}
+        {activeTab === 'marketing' && <MarketingTab clientId={clientId} />}
         {activeTab === 'settings' && <SettingsTab clientId={clientId} client={client} />}
       </div>
     </div>

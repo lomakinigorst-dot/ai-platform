@@ -33,9 +33,11 @@ async def health():
     return {"status": "ok", "version": "1.0.0"}
 
 
-from app.api.v1.endpoints import clients, chat, dashboard, knowledge, settings as settings_router
+from app.api.v1.endpoints import clients, chat, dashboard, knowledge, settings as settings_router, auth, marketing
+app.include_router(auth.router, prefix="/api/v1")
 app.include_router(clients.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(knowledge.router, prefix="/api/v1")
 app.include_router(settings_router.router, prefix="/api/v1")
+app.include_router(marketing.router, prefix="/api/v1")

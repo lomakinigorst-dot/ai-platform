@@ -5,6 +5,15 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Автоматически добавляем JWT из localStorage
+api.interceptors.request.use(config => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export default api;
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -30,7 +39,7 @@ export interface Client {
   dialogs_used: number;
   dialogs_limit: number;
   created_at: string;
-  updated_at: string;
+  updated_at: string | null;
 }
 
 export interface DashboardStats {
@@ -93,7 +102,7 @@ export interface KnowledgeItem {
 
 export const clientsApi = {
   list: (params?: { search?: string; status?: string }) =>
-    api.get<Client[]>('/clients', { params }).then(r => r.data),
+    api.get<{ items: Client[]; total: number }>('/clients', { params }).then(r => r.data.items),
 
   get: (id: string) =>
     api.get<Client>(`/clients/${id}`).then(r => r.data),

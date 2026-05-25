@@ -14,6 +14,7 @@ from app.core.database import get_db, AsyncSessionLocal
 from app.models import Client, ClientStatus, Conversation, Message, Lead
 from app.services.rag import search_knowledge, build_system_prompt
 from app.services.ai import stream_completion
+from app.services.email import send_email, lead_notification_html
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -121,10 +122,27 @@ async def chat_stream(body: ChatRequest, db: AsyncSession = Depends(get_db)):
                             request_text=user_message,
                         )
                         save_db.add(lead)
-                        # Обновляем счётчик
                         conv = await save_db.get(Conversation, conversation_id)
                         if conv:
                             conv.is_lead = True
+
+                        await save_db.commit()
+
+                        # Email-уведомление клиенту
+                        notify_client = await save_db.get(Client, client_id)
+                        if notify_client:
+                            notify_email = _get_client_email(notify_client)
+                            if notify_email:
+                                subject, html = lead_notification_html(
+                                    company_name=notify_client.name,
+                                    assistant_name=notify_client.assistant_name,
+                                    phone=phones[0] if phones else None,
+                                    email=emails[0] if emails else None,
+                                    request_text=user_message,
+                                    conversation_id=str(conversation_id),
+                                )
+                                await send_email(notify_email, subject, html)
+                        return
 
             await save_db.commit()
 
@@ -160,3 +178,15 @@ async def demo_page(domain: str, db: AsyncSession = Depends(get_db)):
     html = html.replace("src=\"widget.js\"", "src=\"/static/widget/widget.js\"")
 
     return HTMLResponse(content=html)
+
+
+def _get_client_email(client: Client) -> str | None:
+    """Получить email для уведомлений: email_notifications > первый из company_contacts."""
+    if client.email_notifications:
+        return client.email_notifications
+    contacts = client.company_contacts
+    if isinstance(contacts, dict):
+        emails = contacts.get("emails", [])
+        if emails:
+            return emails[0]
+    return None

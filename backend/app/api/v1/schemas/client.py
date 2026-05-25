@@ -20,11 +20,14 @@ class ClientResponse(BaseModel):
     company_description: str | None
     assistant_mode: str
     assistant_name: str
+    assistant_gender: str | None = None
+    assistant_avatar_url: str | None = None
     leads_used: int
     leads_limit: int
     dialogs_used: int
     dialogs_limit: int
     created_at: datetime
+    updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
