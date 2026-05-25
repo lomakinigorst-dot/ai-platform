@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Демо AI-ассистента</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #F8FAFC;
+      color: #0F172A;
+      min-height: 100vh;
+    }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 60%, #3B82F6 100%);
+      color: white;
+      padding: 80px 24px 100px;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.3);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 24px;
+      letter-spacing: .3px;
+    }
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 52px);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 20px;
+      letter-spacing: -.5px;
+    }
+    .hero p {
+      font-size: clamp(15px, 2vw, 20px);
+      opacity: .85;
+      max-width: 560px;
+      margin: 0 auto 36px;
+      line-height: 1.6;
+    }
+    .hero-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      color: #2563EB;
+      font-weight: 700;
+      font-size: 16px;
+      padding: 14px 28px;
+      border-radius: 14px;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,.15);
+      transition: transform .15s, box-shadow .15s;
+    }
+    .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,.2); }
+    .hero-cta svg { flex-shrink: 0; }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      background: white;
+      border-bottom: 1px solid #E2E8F0;
+      overflow-x: auto;
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 32px;
+      border-right: 1px solid #E2E8F0;
+      min-width: 140px;
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-value { font-size: 28px; font-weight: 800; color: #2563EB; }
+    .stat-label { font-size: 12px; color: #64748B; margin-top: 4px; }
+
+    /* Features */
+    .section { padding: 72px 24px; max-width: 1100px; margin: 0 auto; }
+    .section-title {
+      text-align: center;
+      font-size: clamp(22px, 3vw, 36px);
+      font-weight: 800;
+      margin-bottom: 12px;
+      letter-spacing: -.3px;
+    }
+    .section-sub {
+      text-align: center;
+      color: #64748B;
+      font-size: 16px;
+      margin-bottom: 48px;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .feature-card {
+      background: white;
+      border: 1px solid #E2E8F0;
+      border-radius: 20px;
+      padding: 28px;
+      transition: box-shadow .2s, transform .2s;
+    }
+    .feature-card:hover { box-shadow: 0 8px 32px rgba(37,99,235,.1); transform: translateY(-3px); }
+    .feature-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      background: #EFF6FF; display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px;
+      font-size: 24px;
+    }
+    .feature-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+    .feature-card p { color: #64748B; font-size: 14px; line-height: 1.6; }
+
+    /* How it works */
+    .how-section {
+      background: #EFF6FF;
+      padding: 72px 24px;
+    }
+    .how-inner { max-width: 900px; margin: 0 auto; }
+    .steps { display: flex; flex-direction: column; gap: 0; margin-top: 48px; }
+    .step {
+      display: flex;
+      gap: 24px;
+      padding-bottom: 40px;
+      position: relative;
+    }
+    .step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 19px;
+      top: 52px;
+      bottom: 0;
+      width: 2px;
+      background: #BFDBFE;
+    }
+    .step-num {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: #2563EB; color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 16px;
+      flex-shrink: 0; z-index: 1;
+    }
+    .step-content h3 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .step-content p { color: #475569; font-size: 14px; line-height: 1.6; }
+
+    /* CTA section */
+    .cta-section {
+      padding: 80px 24px;
+      text-align: center;
+      background: white;
+    }
+    .cta-section h2 {
+      font-size: clamp(24px, 3vw, 40px);
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+    .cta-section p { color: #64748B; font-size: 16px; margin-bottom: 36px; }
+    .cta-btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: #2563EB; color: white;
+      font-weight: 700; font-size: 16px;
+      padding: 16px 32px; border-radius: 14px;
+      cursor: pointer; border: none;
+      box-shadow: 0 4px 20px rgba(37,99,235,.35);
+      transition: background .15s, transform .15s;
+    }
+    .cta-btn:hover { background: #1D4ED8; transform: translateY(-2px); }
+
+    /* Footer */
+    footer {
+      background: #0F172A;
+      color: #94A3B8;
+      text-align: center;
+      padding: 24px;
+      font-size: 13px;
+    }
+
+    /* Demo info bar */
+    .demo-bar {
+      background: #FEF3C7;
+      border-bottom: 1px solid #F59E0B;
+      padding: 10px 24px;
+      text-align: center;
+      font-size: 13px;
+      color: #92400E;
+    }
+    .demo-bar strong { font-weight: 700; }
+
+    @media (max-width: 600px) {
+      .stat-item { padding: 16px 20px; min-width: 110px; }
+      .stat-value { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="demo-bar">
+    <strong>Демо-режим.</strong> Справа внизу → кнопка AI-ассистента. Нажмите и задайте вопрос о компании.
+  </div>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-badge">🤖 AI-ассистент на вашем сайте</div>
+    <h1>Автоматизируйте общение<br>с клиентами на 80%</h1>
+    <p>AI-консультант отвечает на вопросы 24/7, собирает лиды и передаёт их вашему отделу продаж</p>
+    <button class="hero-cta" onclick="document.getElementById('aipw-btn')?.click()">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+        <path d="M20 2H4a2 2 0 00-2 2v18l4-4h14a2 2 0 002-2V4a2 2 0 00-2-2z"/>
+      </svg>
+      Попробовать сейчас
+    </button>
+  </section>
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-item">
+      <div class="stat-value">80%</div>
+      <div class="stat-label">вопросов закрывает AI</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">24/7</div>
+      <div class="stat-label">работает без выходных</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">3 мин</div>
+      <div class="stat-label">подключение к сайту</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">×3</div>
+      <div class="stat-label">рост конверсии в лид</div>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <div class="section">
+    <div class="section-title">Что умеет AI-ассистент</div>
+    <div class="section-sub">Всё необходимое для автоматизации продаж и поддержки клиентов</div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🧠</div>
+        <h3>Знает ваш бизнес</h3>
+        <p>Автоматически изучает ваш сайт и создаёт базу знаний. Отвечает точно по вашим продуктам, ценам и услугам.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💬</div>
+        <h3>Живой диалог</h3>
+        <p>Общается как настоящий менеджер. Уточняет потребности, предлагает решения, не выходит за рамки темы.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📋</div>
+        <h3>Собирает лиды</h3>
+        <p>Предлагает оставить телефон или email в нужный момент. Все контакты сразу приходят вам в CRM.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Аналитика диалогов</h3>
+        <p>Видите все разговоры, популярные вопросы и конверсию. Понимаете что интересует ваших клиентов.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <h3>Интеграции</h3>
+        <p>Работает с Bitrix24, AmoCRM, Telegram. Лиды автоматически создаются в вашей системе.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Быстрый старт</h3>
+        <p>Укажите адрес сайта — через 10 минут AI изучит его и будет готов отвечать клиентам.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="how-section">
+    <div class="how-inner">
+      <div class="section-title">Как это работает</div>
+      <div class="section-sub">От подключения до первого лида — за один день</div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Добавляете сайт клиента</h3>
+            <p>В личном кабинете вводите URL сайта. AI автоматически сканирует все страницы, извлекает информацию о продуктах, ценах и услугах.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Настраиваете ассистента</h3>
+            <p>Выбираете имя, аватар и режим работы — продажник или поддержка. При необходимости дополняете базу знаний вручную.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Вставляете один тег на сайт</h3>
+            <p>Копируете две строки кода и добавляете на сайт клиента. Виджет появляется мгновенно — никаких плагинов и разработчиков.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h3>Получаете лиды и аналитику</h3>
+            <p>AI общается с клиентами, собирает контакты и передаёт в CRM. Вы видите статистику и доход от каждого клиента.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-section">
+    <h2>Готовы подключить AI-ассистента?</h2>
+    <p>Поговорите с нашим ботом прямо сейчас — нажмите кнопку справа внизу</p>
+    <button class="cta-btn" onclick="document.getElementById('aipw-btn')?.click()">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+        <path d="M20 2H4a2 2 0 00-2 2v18l4-4h14a2 2 0 002-2V4a2 2 0 00-2-2z"/>
+      </svg>
+      Начать разговор
+    </button>
+  </div>
+
+  <footer>
+    <p>© 2025 AI Platform · Демо-страница для презентации виджета клиентам</p>
+  </footer>
+
+  <!-- Widget -->
+  <script>
+    window.AIPlatformConfig = {
+      apiBase: 'WIDGET_API_BASE',
+      domain:  'WIDGET_DOMAIN',
+      name:    'WIDGET_NAME',
+      avatar:  'WIDGET_AVATAR',
+      triggerDelay: 4000,
+    };
+  </script>
+  <script src="widget.js"></script>
+
+</body>
+</html>
