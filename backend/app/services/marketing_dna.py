@@ -13,8 +13,8 @@ from app.models import Client, KnowledgeItem
 from app.services.ai import complete_analysis
 
 
-async def _get_knowledge(db: AsyncSession, client_id: UUID, limit: int = 30) -> str:
-    """Берём топ-N чанков базы знаний для контекста."""
+async def _get_knowledge(db: AsyncSession, client_id: UUID, limit: int = 10) -> str:
+    """Берём топ-N чанков базы знаний, не более 8000 символов суммарно."""
     result = await db.execute(
         select(KnowledgeItem)
         .where(KnowledgeItem.client_id == client_id)
@@ -23,9 +23,17 @@ async def _get_knowledge(db: AsyncSession, client_id: UUID, limit: int = 30) -> 
     items = result.scalars().all()
     if not items:
         return "(база знаний пуста)"
-    return "\n\n---\n\n".join(
-        f"[{item.source_url or 'manual'}]\n{item.content}" for item in items
-    )
+
+    parts = []
+    total_chars = 0
+    for item in items:
+        chunk = f"[{item.source_url or 'manual'}]\n{item.content[:600]}"
+        total_chars += len(chunk)
+        if total_chars > 8000:
+            break
+        parts.append(chunk)
+
+    return "\n\n---\n\n".join(parts)
 
 
 def _base_system(client: Client) -> str:
@@ -86,9 +94,9 @@ async def run_dna_analysis(client_id: UUID) -> None:
             result = await complete_analysis(
                 system=system + "\n\nДействуй как психолог-маркетолог. Твоя задача — вскрыть глубинные мотивы покупателей.",
                 user=f"""КОМПАНИЯ: {client.name}
-НИША (из анализа): {data['niche_analysis'][:500]}
+НИША: {data['niche_analysis'][:300]}
 БАЗА ЗНАНИЙ:
-{knowledge}
+{knowledge[:3000]}
 
 Проведи глубокий психологический анализ целевой аудитории:
 
@@ -101,7 +109,7 @@ async def run_dna_analysis(client_id: UUID) -> None:
 **КОГНИТИВНЫЕ ИСКАЖЕНИЯ** — какие убеждения мешают принять решение
 
 Для каждого пункта: 3-5 конкретных примеров из жизни реального покупателя.""",
-                max_tokens=3000,
+                max_tokens=2000,
             )
             data["target_audience"] = result
             client.marketing_data = dict(data)
@@ -113,7 +121,7 @@ async def run_dna_analysis(client_id: UUID) -> None:
                 user=f"""На основе анализа ЦА создай 3-4 детальных аватара покупателя.
 
 АНАЛИЗ ЦА:
-{data['target_audience'][:1000]}
+{data['target_audience'][:600]}
 
 Для каждого аватара:
 - **Имя и возраст** (вымышленные, но реалистичные)
@@ -126,7 +134,7 @@ async def run_dna_analysis(client_id: UUID) -> None:
 - **Цитата** — как он сам описывает свою проблему
 
 Аватары должны быть разными, охватывать разные сегменты.""",
-                max_tokens=3000,
+                max_tokens=2000,
             )
             data["avatars"] = result
             client.marketing_data = dict(data)
@@ -138,7 +146,7 @@ async def run_dna_analysis(client_id: UUID) -> None:
                 user=f"""Создай полную карту поисковых сценариев для компании.
 
 АВАТАРЫ:
-{data['avatars'][:800]}
+{data['avatars'][:500]}
 
 **1. СЦЕНАРИИ ПОИСКА** — 6 ситуаций когда человек ищет этот продукт
 **2. ТИПОЛОГИЯ ЗАПРОСОВ** — информационные / коммерческие / навигационные / транзакционные
@@ -148,7 +156,7 @@ async def run_dna_analysis(client_id: UUID) -> None:
 **6. ПОИСКОВЫЕ ЦЕПОЧКИ** — путь от первого запроса до покупки
 
 Конкретно, с примерами реальных запросов.""",
-                max_tokens=3000,
+                max_tokens=2000,
             )
             data["search_scenarios"] = result
             client.marketing_data = dict(data)
@@ -160,7 +168,7 @@ async def run_dna_analysis(client_id: UUID) -> None:
                 user=f"""Проведи сегментацию аудитории для таргетированной рекламы.
 
 АВАТАРЫ:
-{data['avatars'][:500]}
+{data['avatars'][:400]}
 
 Опиши 4-5 рекламных сегментов. Для каждого:
 - **Кто это** — социально-демографический портрет
@@ -169,7 +177,7 @@ async def run_dna_analysis(client_id: UUID) -> None:
 - **Тон обращения** — официально/дружески/экспертно/с юмором
 - **Рекламный подход** — механика объявления которая сработает
 - **Пример заголовка** — конкретный заголовок для этого сегмента""",
-                max_tokens=3000,
+                max_tokens=2000,
             )
             data["segments"] = result
             client.marketing_data = dict(data)
@@ -181,7 +189,7 @@ async def run_dna_analysis(client_id: UUID) -> None:
                 user=f"""Создай рекламные материалы для первых двух сегментов.
 
 СЕГМЕНТЫ:
-{data['segments'][:800]}
+{data['segments'][:500]}
 
 Для каждого из 2 топ-сегментов:
 
@@ -196,7 +204,7 @@ async def run_dna_analysis(client_id: UUID) -> None:
 
 **БЫСТРЫЕ ССЫЛКИ (4 штуки)**
 - Короткие заголовки для расширений объявлений""",
-                max_tokens=3000,
+                max_tokens=2000,
             )
             data["utps_headlines"] = result
             client.marketing_data = dict(data)
@@ -205,11 +213,11 @@ async def run_dna_analysis(client_id: UUID) -> None:
             # ── ШАГ 7: Автозаполнение настроек AI-консультанта ──────────────
             result_json = await complete_analysis(
                 system=system,
-                user=f"""На основе всего маркетингового анализа создай настройки AI-консультанта.
+                user=f"""На основе маркетингового анализа создай настройки AI-консультанта.
 
-НИША: {data['niche_analysis'][:300]}
-ЦА: {data['target_audience'][:500]}
-АВАТАРЫ: {data['avatars'][:400]}
+НИША: {data['niche_analysis'][:200]}
+ЦА (краткий): {data['target_audience'][:300]}
+АВАТАРЫ (краткий): {data['avatars'][:200]}
 ВОЗРАЖЕНИЯ И БОЛИ (из анализа ЦА): извлеки сам из данных выше
 
 Верни ТОЛЬКО валидный JSON без markdown-обёртки:

@@ -1,14 +1,11 @@
 """
-AI-сервис: два провайдера.
-- DeepSeek (прямой API) — диалоги в виджете, быстро, дёшево
-- Claude Sonnet (Anthropic API) — маркетинг-анализ, ДНК, тексты — качество
+AI-сервис: DeepSeek для всего (диалоги + анализ).
+Claude Sonnet подключится позже когда появится ключ.
 """
 from openai import AsyncOpenAI
-from anthropic import AsyncAnthropic
 from app.core.config import settings
 
 _deepseek: AsyncOpenAI | None = None
-_claude: AsyncAnthropic | None = None
 
 
 def get_deepseek() -> AsyncOpenAI:
@@ -21,17 +18,10 @@ def get_deepseek() -> AsyncOpenAI:
     return _deepseek
 
 
-def get_claude() -> AsyncAnthropic:
-    global _claude
-    if _claude is None:
-        _claude = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-    return _claude
-
-
-# ── Диалоги (виджет, чат) ── DeepSeek ──────────────────────────────────────
+# ── Диалоги (виджет, чат) — быстро, до 800 токенов ─────────────────────────
 
 async def stream_dialog(messages: list[dict]):
-    """Стриминг ответа виджета — DeepSeek, быстро."""
+    """Стриминг ответа виджета."""
     stream = await get_deepseek().chat.completions.create(
         model=settings.MODEL_DIALOG,
         messages=messages,
@@ -46,7 +36,7 @@ async def stream_dialog(messages: list[dict]):
 
 
 async def complete_dialog(messages: list[dict]) -> str:
-    """Полный ответ (без стриминга) — DeepSeek."""
+    """Полный ответ без стриминга."""
     resp = await get_deepseek().chat.completions.create(
         model=settings.MODEL_DIALOG,
         messages=messages,
@@ -56,45 +46,48 @@ async def complete_dialog(messages: list[dict]) -> str:
     return resp.choices[0].message.content or ""
 
 
-# ── Анализ и тексты ── Claude Sonnet ───────────────────────────────────────
+# ── Анализ и тексты — развёрнутые ответы, до 4000 токенов ──────────────────
 
-async def stream_analysis(system: str, user: str, max_tokens: int = 4096):
-    """Стриминг аналитики — Claude Sonnet, качество."""
-    async with get_claude().messages.stream(
-        model=settings.MODEL_ANALYSIS,
+async def stream_analysis(system: str, user: str, max_tokens: int = 4000):
+    """Стриминг аналитического ответа — для маркетолога, отчётов."""
+    stream = await get_deepseek().chat.completions.create(
+        model=settings.MODEL_DIALOG,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        stream=True,
+        temperature=0.3,   # меньше температура = точнее для анализа
         max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    ) as stream:
-        async for text in stream.text_stream:
-            yield text
-
-
-async def complete_analysis(system: str, user: str, max_tokens: int = 4096) -> str:
-    """Полный аналитический ответ без стриминга — для фоновых задач."""
-    msg = await get_claude().messages.create(
-        model=settings.MODEL_ANALYSIS,
-        max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": user}],
     )
-    return msg.content[0].text
+    async for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
 
 
-# ── Обратная совместимость (старые эндпоинты используют эти имена) ──────────
+async def complete_analysis(system: str, user: str, max_tokens: int = 4000) -> str:
+    """Полный аналитический ответ без стриминга — для фоновых задач (ДНК-анализ)."""
+    resp = await get_deepseek().chat.completions.create(
+        model=settings.MODEL_DIALOG,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        temperature=0.3,
+        max_tokens=max_tokens,
+    )
+    return resp.choices[0].message.content or ""
+
+
+# ── Совместимость со старым кодом ───────────────────────────────────────────
 
 async def stream_completion(messages: list[dict], model: str | None = None):
-    """Устаревшее имя — роутим по модели."""
-    if model and "claude" in model.lower():
-        system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        user = next((m["content"] for m in messages if m["role"] == "user"), "")
-        async for chunk in stream_analysis(system, user):
-            yield chunk
-    else:
-        async for chunk in stream_dialog(messages):
-            yield chunk
+    """Обёртка для старых эндпоинтов."""
+    async for chunk in stream_dialog(messages):
+        yield chunk
 
 
 async def chat_completion(messages: list[dict], model: str | None = None, stream: bool = False):
-    """Устаревшее имя — только не-стриминг."""
+    """Обёртка для старых эндпоинтов."""
     return await complete_dialog(messages)
