@@ -70,11 +70,39 @@
 - [x] SettingsTab → вкладка "Портал клиента": кнопка создания ссылки + копирование
 - [x] /portal/[token] — отдельная страница: статистика, лиды, ДНК-анализ (без AIRail)
 
-### Шаг 9: Деплой
-- [ ] Vercel (frontend) + Railway/Render (backend + PostgreSQL)
-- [ ] .env переменные в хостинге
-- [ ] CORS: добавить продакшн домен
-- [ ] Проверка виджета на продакшн-домене
+### Шаг 9: Деплой на Яндекс Облако 🔜 СЛЕДУЮЩИЙ ШАГ
+**Решение: Яндекс Облако** (выбрано вместо Railway/Vercel т.к. российская аудитория)
+**Грант:** программа Boost Start — 50 000 ₽ на 6 месяцев (покрывает всё)
+
+**Архитектура:**
+- Compute Cloud VM (2 vCPU, 4GB RAM) — backend FastAPI + frontend Next.js + nginx (~2 500 ₽/мес)
+- Managed PostgreSQL 1 хост (с pgvector) (~3 500 ₽/мес)
+- Managed Redis 1 хост (~1 750 ₽/мес)
+- Object Storage — widget.js (~3 ₽/мес)
+- **Итого: ~7 750 ₽/мес (покрывается грантом)**
+
+**Что уже готово к деплою:**
+- [x] Dockerfile с CMD — backend
+- [x] railway.toml (для Railway, адаптируем под YC)
+- [x] CORS настроен (разрешает *.vercel.app + BASE_DOMAIN)
+- [x] next.config.ts обновлён (images remotePatterns)
+- [x] Код запушен на GitHub: github.com/lomakinigorst-dot/ai-platform
+
+**Что нужно от Игоря:**
+- [ ] Зарегистрироваться на yandex.cloud/ru (войти через Яндекс ID + привязать карту)
+- [ ] Подать заявку на грант: yandex.cloud/ru/grants → Boost → Start
+- [ ] Создать сервисный аккаунт → роль editor → дать мне API-ключ (я сам всё создам через yc CLI)
+
+**Что сделаю я после получения токена:**
+- [ ] Установить yc CLI, авторизоваться
+- [ ] Создать VM (Compute Cloud)
+- [ ] Создать Managed PostgreSQL + включить pgvector
+- [ ] Создать Managed Redis
+- [ ] Object Storage для widget.js
+- [ ] Docker на VM: backend + frontend + nginx
+- [ ] Настроить домен + SSL
+- [ ] Прогнать alembic миграции на продакшн БД
+- [ ] Проверить весь флоу end-to-end
 
 ---
 
@@ -90,4 +118,4 @@
 
 ---
 Последнее обновление: 2026-05-26
-Текущий шаг: Шаг 9 — Деплой на хостинг
+Текущий шаг: Шаг 9 — Деплой на Яндекс Облако (ждём регистрацию + API-ключ от Игоря)

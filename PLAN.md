@@ -101,15 +101,27 @@ Radius:           12px карточки, 8px кнопки
 
 ## ЧТО ОСТАЛОСЬ ДО ДЕМО (Шаг 9)
 
-### Деплой — обязательно
-1. Vercel для frontend:
-   - `NEXT_PUBLIC_API_URL=https://your-backend.railway.app/api/v1`
-2. Railway/Render для backend:
-   - DATABASE_URL, REDIS_URL, все ключи из .env
-   - `ENVIRONMENT=production`
-   - `BASE_DOMAIN=your-domain.com`
-3. CORS в main.py: добавить продакшн домен frontend
-4. Проверить виджет на продакшн-домене
+### Деплой — Яндекс Облако (выбрано для российской аудитории)
+
+**Архитектура:**
+- Compute Cloud VM (2 vCPU, 4GB RAM) — backend + frontend + nginx
+- Managed PostgreSQL (1 хост) — с pgvector для RAG
+- Managed Redis (1 хост) — очередь задач ДНК-анализа
+- Object Storage — widget.js статика
+
+**Цена: ~7 750 ₽/мес. Грант Boost Start = 50 000 ₽ на 6 мес → всё покрыто.**
+Грант: yandex.cloud/ru/grants → Boost → Start (для стартапов с MVP)
+
+**Что сделано (готово к деплою):**
+- Dockerfile с CMD для backend
+- CORS настроен (BASE_DOMAIN из .env)
+- Код на GitHub: github.com/lomakinigorst-dot/ai-platform (ветка main)
+
+**Что нужно от Игоря:**
+1. Зарегистрироваться на yandex.cloud/ru
+2. Подать заявку на грант
+3. Создать сервисный аккаунт → роль editor → дать API-ключ
+4. Я сам через yc CLI создаю всю инфраструктуру и деплою
 
 ### После деплоя — приоритет 1
 - Kanban лидов (drag-and-drop воронка)
