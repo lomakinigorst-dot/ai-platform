@@ -154,6 +154,11 @@ export const knowledgeApi = {
     api.post(`/knowledge/clients/${clientId}/items`, data).then(r => r.data),
 };
 
+export const portalApi = {
+  generateToken: (clientId: string) =>
+    api.post<{ portal_token: string }>(`/portal/generate/${clientId}`).then(r => r.data),
+};
+
 export const settingsApi = {
   getAssistant: (clientId: string) =>
     api.get(`/settings/clients/${clientId}/assistant`).then(r => r.data),

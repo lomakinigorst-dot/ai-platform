@@ -1,46 +1,54 @@
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-import { formatDistanceToNow, format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+  return twMerge(clsx(inputs))
 }
 
-export function timeAgo(date: string) {
-  return formatDistanceToNow(new Date(date), { addSuffix: true, locale: ru });
-}
-
-export function formatDate(date: string) {
-  return format(new Date(date), 'd MMM yyyy, HH:mm', { locale: ru });
-}
-
-export function statusLabel(status: string) {
-  const map: Record<string, string> = {
-    pending: 'Ожидает',
-    indexing: 'Индексация',
-    active: 'Активен',
-    error: 'Ошибка',
-    new: 'Новый',
-    contacted: 'Связались',
-    closed: 'Закрыт',
-  };
-  return map[status] ?? status;
+export function formatDate(date: string | Date): string {
+  return new Date(date).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
 }
 
 export function statusColor(status: string): string {
   const map: Record<string, string> = {
-    active: 'bg-green-100 text-green-800',
-    indexing: 'bg-blue-100 text-blue-800',
-    pending: 'bg-gray-100 text-gray-700',
-    error: 'bg-red-100 text-red-800',
-    new: 'bg-yellow-100 text-yellow-800',
-    contacted: 'bg-blue-100 text-blue-800',
-    closed: 'bg-gray-100 text-gray-700',
-  };
-  return map[status] ?? 'bg-gray-100 text-gray-700';
+    demo: "bg-[#f4f3f8] text-[#6b7280]",
+    new: "bg-[#ede9ff] text-[#6b5fd4]",
+    trial: "bg-[#fff3e8] text-[#f97316]",
+    pro: "bg-[#dcfce7] text-[#16a34a]",
+    mega: "bg-[#dbeafe] text-[#2563eb]",
+    active: "bg-[#dcfce7] text-[#16a34a]",
+    inactive: "bg-[#f4f3f8] text-[#9ca3af]",
+  }
+  return map[status?.toLowerCase()] ?? "bg-[#f4f3f8] text-[#6b7280]"
 }
 
-export function modeLabel(mode: string) {
-  return mode === 'sales' ? 'Продажник' : 'Поддержка';
+export function modeLabel(mode: string): string {
+  const map: Record<string, string> = {
+    simple: "Простой",
+    expert: "Эксперт",
+    sales: "Продажи",
+    support: "Поддержка",
+  }
+  return map[mode?.toLowerCase()] ?? mode
+}
+
+export function timeAgo(date: string | Date): string {
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+  if (seconds < 60) return "только что"
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} мин назад`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} ч назад`
+  return `${Math.floor(seconds / 86400)} д назад`
+}
+
+export function statusLabel(status: string): string {
+  const map: Record<string, string> = {
+    demo: "Демо",
+    new: "Новый",
+    trial: "Триал",
+    pro: "Pro",
+    mega: "Mega",
+    active: "Активный",
+    inactive: "Неактивный",
+  }
+  return map[status?.toLowerCase()] ?? status
 }

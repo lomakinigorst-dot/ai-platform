@@ -80,6 +80,23 @@ async def complete_analysis(system: str, user: str, max_tokens: int = 4000) -> s
     return resp.choices[0].message.content or ""
 
 
+# ── Atlas и общий чат — до 2000 токенов ─────────────────────────────────────
+
+async def stream_chat(messages: list[dict], max_tokens: int = 2000):
+    """Стриминг для Atlas и любого длинного диалога."""
+    stream = await get_deepseek().chat.completions.create(
+        model=settings.MODEL_DIALOG,
+        messages=messages,
+        stream=True,
+        temperature=0.7,
+        max_tokens=max_tokens,
+    )
+    async for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
+
+
 # ── Совместимость со старым кодом ───────────────────────────────────────────
 
 async def stream_completion(messages: list[dict], model: str | None = None):

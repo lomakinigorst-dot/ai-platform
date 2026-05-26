@@ -14,9 +14,20 @@ app = FastAPI(
     docs_url="/api/docs",
 )
 
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    f"https://{settings.BASE_DOMAIN}",
+    f"https://www.{settings.BASE_DOMAIN}",
+    f"https://*.{settings.BASE_DOMAIN}",
+]
+# В dev-режиме разрешаем всё с localhost
+if settings.ENVIRONMENT == "development":
+    ALLOWED_ORIGINS += ["http://localhost:3001", "http://127.0.0.1:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", f"https://*.{settings.BASE_DOMAIN}"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,7 +44,7 @@ async def health():
     return {"status": "ok", "version": "1.0.0"}
 
 
-from app.api.v1.endpoints import clients, chat, dashboard, knowledge, settings as settings_router, auth, marketing
+from app.api.v1.endpoints import clients, chat, dashboard, knowledge, settings as settings_router, auth, marketing, atlas, portal
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(clients.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
@@ -41,3 +52,5 @@ app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(knowledge.router, prefix="/api/v1")
 app.include_router(settings_router.router, prefix="/api/v1")
 app.include_router(marketing.router, prefix="/api/v1")
+app.include_router(atlas.router, prefix="/api/v1")
+app.include_router(portal.router, prefix="/api/v1")

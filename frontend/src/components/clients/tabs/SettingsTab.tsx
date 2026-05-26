@@ -2,12 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { settingsApi, Client } from '@/lib/api';
-import { Bot, Code, Plug } from 'lucide-react';
+import { settingsApi, portalApi, Client } from '@/lib/api';
+import { Bot, Code, Plug, Link, Copy, Check } from 'lucide-react';
 
 export default function SettingsTab({ clientId, client }: { clientId: string; client: Client }) {
   const queryClient = useQueryClient();
-  const [section, setSection] = useState<'assistant' | 'embed' | 'integrations'>('assistant');
+  const [section, setSection] = useState<'assistant' | 'embed' | 'integrations' | 'portal'>('assistant');
+  const [portalLink, setPortalLink] = useState<string | null>(null);
+  const [copiedPortal, setCopiedPortal] = useState(false);
+
+  const portalMutation = useMutation({
+    mutationFn: () => portalApi.generateToken(clientId),
+    onSuccess: (data) => {
+      const base = typeof window !== 'undefined' ? window.location.origin : '';
+      setPortalLink(`${base}/portal/${data.portal_token}`);
+    },
+  });
 
   // Assistant settings
   const [assistant, setAssistant] = useState({
@@ -70,7 +80,7 @@ export default function SettingsTab({ clientId, client }: { clientId: string; cl
     <div className="max-w-2xl">
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl w-fit">
-        {([['assistant', 'Ассистент', Bot], ['embed', 'Код виджета', Code], ['integrations', 'Интеграции', Plug]] as const).map(([id, label, Icon]) => (
+        {([['assistant', 'Ассистент', Bot], ['embed', 'Код виджета', Code], ['integrations', 'Интеграции', Plug], ['portal', 'Портал клиента', Link]] as const).map(([id, label, Icon]) => (
           <button
             key={id}
             onClick={() => setSection(id)}
@@ -187,6 +197,55 @@ export default function SettingsTab({ clientId, client }: { clientId: string; cl
           >
             Скопировать код
           </button>
+        </div>
+      )}
+
+      {/* Portal */}
+      {section === 'portal' && (
+        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+          <h3 className="font-semibold text-gray-900">Портал для клиента</h3>
+          <p className="text-sm text-gray-500">
+            Создайте ссылку доступа, которую клиент откроет без логина — увидит свою статистику, лиды и результаты ДНК-анализа.
+          </p>
+
+          <button
+            onClick={() => portalMutation.mutate()}
+            disabled={portalMutation.isPending}
+            className="w-full bg-[#6b5fd4] text-white py-2.5 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60 transition-opacity"
+          >
+            {portalMutation.isPending ? 'Генерирую...' : portalLink ? 'Пересоздать ссылку' : 'Создать ссылку доступа'}
+          </button>
+
+          {portalLink && (
+            <div className="border border-[#ede9ff] rounded-lg p-3 bg-[#f9f8ff]">
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={portalLink}
+                  className="flex-1 text-xs text-[#374151] bg-transparent outline-none truncate"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(portalLink);
+                    setCopiedPortal(true);
+                    setTimeout(() => setCopiedPortal(false), 2000);
+                  }}
+                  className="flex-shrink-0"
+                >
+                  {copiedPortal
+                    ? <Check className="w-4 h-4 text-green-500" />
+                    : <Copy className="w-4 h-4 text-[#9ca3af] hover:text-[#6b5fd4]" />
+                  }
+                </button>
+              </div>
+            </div>
+          )}
+
+          {portalLink && (
+            <p className="text-xs text-gray-400">
+              Ссылка даёт доступ только к данным этого клиента. Пересоздайте её, если нужно аннулировать старую.
+            </p>
+          )}
         </div>
       )}
 

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { Bot, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,7 +19,6 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/login', { email, password });
-      // Сохраняем в cookie (для middleware) и localStorage (для API-запросов)
       document.cookie = `token=${data.access_token}; path=/; max-age=${7 * 24 * 3600}; SameSite=Lax`;
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('agent_email', data.email);
@@ -32,71 +31,165 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-200">
-            <Bot className="w-8 h-8 text-white" />
+    <div
+      className="min-h-screen flex"
+      style={{ background: 'var(--rail-bg)' }}
+    >
+      {/* Left: branding */}
+      <div className="hidden lg:flex flex-col justify-between w-[420px] flex-shrink-0 p-10">
+        <div className="flex items-center gap-2">
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-sm"
+            style={{ background: 'var(--primary)' }}
+          >
+            A
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">AI Platform</h1>
-          <p className="text-gray-500 text-sm mt-1">Агентский кабинет</p>
+          <span className="text-white font-bold text-base">ATLAS</span>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="admin@example.com"
-              required
-              autoFocus
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            />
+        <div>
+          <h2 className="text-3xl font-bold text-white mb-4 leading-tight">
+            Платформа для<br />
+            AI-ассистентов
+          </h2>
+          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 15, lineHeight: 1.6 }}>
+            Управляйте AI-консультантами для ваших клиентов.
+            ДНК-анализ, база знаний, лиды — всё в одном месте.
+          </p>
+        </div>
+
+        {/* Features list */}
+        <div className="space-y-3">
+          {[
+            { dot: '#a78bfa', text: 'Автоматический ДНК-анализ сайта' },
+            { dot: '#60a5fa', text: 'SSE-стриминг диалогов в реальном времени' },
+            { dot: '#4ade80', text: 'RAG: база знаний на pgvector' },
+          ].map(({ dot, text }) => (
+            <div key={text} className="flex items-center gap-3">
+              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: dot }} />
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>{text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Right: form */}
+      <div
+        className="flex-1 flex items-center justify-center p-6"
+        style={{ background: 'var(--bg)' }}
+      >
+        <div className="w-full max-w-sm">
+          {/* Mobile logo */}
+          <div className="flex items-center gap-2 mb-8 lg:hidden">
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-sm"
+              style={{ background: 'var(--primary)' }}
+            >
+              A
+            </div>
+            <span className="font-bold text-base" style={{ color: 'var(--text)' }}>ATLAS</span>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Пароль</label>
-            <div className="relative">
-              <input
-                type={showPass ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 pr-11"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPass(s => !s)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text)' }}>
+            Вход
+          </h1>
+          <p className="text-sm mb-7" style={{ color: 'var(--text-muted)' }}>
+            Агентский кабинет
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label
+                className="block text-sm font-medium mb-1.5"
+                style={{ color: 'var(--text)' }}
               >
-                {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="admin@example.com"
+                required
+                autoFocus
+                className="w-full border rounded-xl px-4 py-3 text-sm outline-none transition-all"
+                style={{
+                  borderColor: 'var(--border)',
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+              />
             </div>
-          </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-              {error}
+            <div>
+              <label
+                className="block text-sm font-medium mb-1.5"
+                style={{ color: 'var(--text)' }}
+              >
+                Пароль
+              </label>
+              <div className="relative">
+                <input
+                  type={showPass ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="w-full border rounded-xl px-4 py-3 pr-11 text-sm outline-none transition-all"
+                  style={{
+                    borderColor: 'var(--border)',
+                    background: 'var(--surface)',
+                    color: 'var(--text)',
+                  }}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--primary)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(s => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: 'var(--text-subtle)' }}
+                >
+                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Вход...
-              </>
-            ) : 'Войти'}
-          </button>
-        </form>
+            {error && (
+              <div
+                className="rounded-xl px-4 py-3 text-sm border"
+                style={{
+                  background: 'var(--danger-light)',
+                  borderColor: '#fca5a5',
+                  color: 'var(--danger)',
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full text-white font-semibold py-3 rounded-xl transition-opacity flex items-center justify-center gap-2 mt-2"
+              style={{
+                background: 'var(--primary)',
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Вход...
+                </>
+              ) : (
+                'Войти'
+              )}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

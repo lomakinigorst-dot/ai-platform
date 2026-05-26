@@ -1,10 +1,11 @@
 import AppShell from '@/components/layout/AppShell';
 import ClientDetailPage from '@/components/clients/ClientDetailPage';
 
-export default function Page({ params }: { params: { id: string } }) {
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   return (
     <AppShell>
-      <ClientDetailPage clientId={params.id} />
+      <ClientDetailPage clientId={id} />
     </AppShell>
   );
 }
