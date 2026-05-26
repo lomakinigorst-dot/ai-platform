@@ -157,27 +157,110 @@ async def chat_stream(body: ChatRequest, db: AsyncSession = Depends(get_db)):
 
 @router.get("/demo/{domain}", response_class=HTMLResponse)
 async def demo_page(domain: str, db: AsyncSession = Depends(get_db)):
+    """
+    WOW-демо: берёт реальную главную страницу клиента, инжектирует виджет.
+    Клиент открывает и видит свой собственный сайт с уже работающим AI.
+    """
+    import re as _re
+    import httpx
+
     client = await db.scalar(select(Client).where(Client.domain == domain))
     if not client:
         raise HTTPException(404, "Клиент не найден")
 
-    demo_html_path = Path(__file__).parent.parent.parent.parent.parent.parent / "widget" / "demo.html"
-    if not demo_html_path.exists():
-        raise HTTPException(500, "demo.html не найден")
+    site_url = client.website_url.rstrip("/")
+    base_url = f"https://{domain}"
 
-    html = demo_html_path.read_text(encoding="utf-8")
+    # Пытаемся получить реальную страницу клиента
+    original_html: str | None = None
+    try:
+        async with httpx.AsyncClient(
+            timeout=10,
+            follow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; AI-Platform-Demo/1.0)"},
+        ) as http:
+            resp = await http.get(site_url)
+            if resp.status_code == 200:
+                original_html = resp.text
+    except Exception:
+        pass
 
-    api_base = "http://localhost:8000"
-    avatar = client.assistant_avatar_url or "null"
-    avatar_js = f"'{avatar}'" if avatar != "null" else "null"
+    # Если не смогли получить сайт — используем fallback-шаблон
+    if not original_html:
+        original_html = _fallback_html(client)
 
-    html = html.replace("'WIDGET_API_BASE'", f"'{api_base}'")
-    html = html.replace("'WIDGET_DOMAIN'", f"'{client.domain}'")
-    html = html.replace("'WIDGET_NAME'", f"'{client.assistant_name}'")
-    html = html.replace("'WIDGET_AVATAR'", avatar_js)
-    html = html.replace("src=\"widget.js\"", "src=\"/static/widget/widget.js\"")
+    # Конвертируем относительные URL в абсолютные (чтобы картинки и стили грузились)
+    for attr in ("src", "href", "action"):
+        original_html = _re.sub(
+            rf'({attr}=["\'])(/[^"\']*)',
+            rf'\g<1>{base_url}\g<2>',
+            original_html,
+        )
 
-    return HTMLResponse(content=html)
+    # Убираем CSP/X-Frame-Options из мета-тегов (мешают встраиванию)
+    original_html = _re.sub(
+        r'<meta[^>]+http-equiv=["\'](?:Content-Security-Policy|X-Frame-Options)["\'][^>]*>',
+        '',
+        original_html,
+        flags=_re.IGNORECASE,
+    )
+
+    # Определяем base_url бэкенда
+    from app.core.config import settings
+    api_base = f"https://{settings.BASE_DOMAIN}" if settings.ENVIRONMENT == "production" else "http://localhost:8000"
+
+    avatar = client.assistant_avatar_url or ""
+    avatar_js = f"'{avatar}'" if avatar else "null"
+
+    widget_snippet = f"""
+<!-- AI Platform Demo Widget -->
+<div style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#FEF3C7;border-bottom:2px solid #F59E0B;padding:10px 20px;text-align:center;font-family:system-ui;font-size:13px;color:#92400E">
+  <strong>Демо AI-ассистента</strong> для {client.name} — нажмите кнопку справа внизу, чтобы поговорить с AI
+</div>
+<script>
+  window.AIPlatformConfig = {{
+    apiBase: '{api_base}',
+    domain:  '{client.domain}',
+    name:    '{client.assistant_name}',
+    avatar:  {avatar_js},
+    triggerDelay: 3000,
+  }};
+</script>
+<script src="{api_base}/static/widget/widget.js" async></script>
+"""
+
+    # Вставляем виджет перед </body> (или в конец если тег не найден)
+    if "</body>" in original_html.lower():
+        original_html = _re.sub(r'</body>', widget_snippet + "</body>", original_html, flags=_re.IGNORECASE, count=1)
+    else:
+        original_html += widget_snippet
+
+    return HTMLResponse(content=original_html)
+
+
+def _fallback_html(client: "Client") -> str:
+    """Резервный шаблон если не удалось загрузить сайт клиента."""
+    return f"""<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{client.name} — Демо AI-ассистента</title>
+  <style>
+    body{{font-family:system-ui,sans-serif;background:#F8FAFC;color:#0F172A;min-height:100vh;display:flex;align-items:center;justify-content:center}}
+    .card{{background:white;border:1px solid #E2E8F0;border-radius:20px;padding:48px;text-align:center;max-width:480px}}
+    h1{{font-size:28px;font-weight:800;margin-bottom:12px}}
+    p{{color:#64748B;line-height:1.6}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div style="font-size:48px;margin-bottom:20px">🤖</div>
+    <h1>{client.name}</h1>
+    <p>AI-ассистент готов к работе.<br>Нажмите кнопку справа внизу, чтобы начать диалог.</p>
+  </div>
+</body>
+</html>"""
 
 
 def _get_client_email(client: Client) -> str | None:

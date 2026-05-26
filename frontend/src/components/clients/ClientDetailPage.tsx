@@ -110,15 +110,17 @@ export default function ClientDetailPage({ clientId }: { clientId: string }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <a
-              href={`http://localhost:8000/api/v1/chat/demo/${client.domain}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50"
+            <button
+              onClick={() => {
+                const url = `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1','') ?? 'http://localhost:8000'}/api/v1/chat/demo/${client.domain}`;
+                navigator.clipboard.writeText(url);
+                window.open(url, '_blank');
+              }}
+              className="flex items-center gap-1.5 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 hover:bg-emerald-100 font-medium"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              Demo
-            </a>
+              Демо-ссылка
+            </button>
             <button
               onClick={() => reindexMutation.mutate()}
               disabled={reindexMutation.isPending || client.status === 'indexing'}
