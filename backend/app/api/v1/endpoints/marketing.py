@@ -1,7 +1,7 @@
 import json
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -17,6 +17,38 @@ router = APIRouter(prefix="/marketing", tags=["marketing"])
 class MarketingRequest(BaseModel):
     competitor_urls: list[str] = []
     extra_context: str = ""
+
+
+# ── ДНК-анализ: чтение и перезапуск ─────────────────────────────────────────
+
+@router.get("/clients/{client_id}/dna")
+async def get_dna(client_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Возвращает результаты ДНК-анализа и текущий статус."""
+    client = await db.get(Client, client_id)
+    if not client:
+        raise HTTPException(404, "Клиент не найден")
+    return {
+        "status": client.marketing_status,
+        "data": client.marketing_data or {},
+    }
+
+
+@router.post("/clients/{client_id}/dna/run")
+async def run_dna(
+    client_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Принудительно перезапускает ДНК-анализ (например после обновления базы знаний)."""
+    client = await db.get(Client, client_id)
+    if not client:
+        raise HTTPException(404, "Клиент не найден")
+    if client.marketing_status == "running":
+        raise HTTPException(400, "Анализ уже запущен")
+
+    from app.services.marketing_dna import run_dna_analysis
+    background_tasks.add_task(run_dna_analysis, client_id)
+    return {"status": "started"}
 
 
 MARKETING_SECTIONS = {

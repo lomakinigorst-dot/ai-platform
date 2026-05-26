@@ -168,7 +168,7 @@ async def index_website(client_id: UUID, url: str):
                 client.index_progress = round(indexed / max(len(all_chunks), 1) * 100, 1)
                 await db.commit()
 
-            # 5. Готово
+            # 5. Сканирование готово
             client.status = ClientStatus.active
             client.index_progress = 100.0
             client.pages_indexed = len(pages)
@@ -179,3 +179,7 @@ async def index_website(client_id: UUID, url: str):
             client.index_progress = 0
             await db.commit()
             raise
+
+    # 6. Авто-ДНК-анализ (отдельная сессия, не блокирует статус active)
+    from app.services.marketing_dna import run_dna_analysis
+    await run_dna_analysis(client_id)

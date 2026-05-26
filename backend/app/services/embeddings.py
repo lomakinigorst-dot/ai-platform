@@ -14,17 +14,17 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]
 
 
 async def get_embedding(text: str) -> list[float]:
-    """Получает векторное представление текста через OpenRouter / DeepSeek."""
+    """Эмбеддинги через OpenAI API напрямую (DeepSeek не поддерживает)."""
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
-            "https://openrouter.ai/api/v1/embeddings",
+            "https://api.openai.com/v1/embeddings",
             headers={
-                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
                 "Content-Type": "application/json",
             },
             json={
-                "model": "openai/text-embedding-3-small",
-                "input": text[:8000],  # лимит токенов
+                "model": "text-embedding-3-small",
+                "input": text[:8000],
             },
         )
         resp.raise_for_status()

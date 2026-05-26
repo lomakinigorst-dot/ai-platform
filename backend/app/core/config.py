@@ -6,13 +6,15 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     DEEPSEEK_API_KEY: str = ""
-    OPENROUTER_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""      # только для эмбеддингов (text-embedding-3-small)
+    OPENROUTER_API_KEY: str = ""  # не используется, оставлен для совместимости
     FIRECRAWL_API_KEY: str = ""
 
-    # Модели через OpenRouter
-    MODEL_DIALOG: str = "deepseek/deepseek-chat"        # диалоги — быстро и дёшево
-    MODEL_ANALYSIS: str = "anthropic/claude-sonnet-4-5" # анализ ЦА, тексты — качество
+    # DeepSeek прямой API — диалоги, быстро и дёшево
+    MODEL_DIALOG: str = "deepseek-chat"
+    # Anthropic прямой API — маркетинг-анализ, ДНК, тексты, качество
+    MODEL_ANALYSIS: str = "claude-sonnet-4-6"
 
     SECRET_KEY: str = "dev-secret-key-change-in-production"
     ALGORITHM: str = "HS256"

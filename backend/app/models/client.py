@@ -72,6 +72,10 @@ class Client(Base):
     trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     subscription_ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # ДНК-анализ маркетолога (автозапуск после сканирования)
+    marketing_status: Mapped[str] = mapped_column(String(50), default="none")  # none|running|done|failed
+    marketing_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)   # результаты 7 шагов
+
     # Интеграции
     email_notifications: Mapped[str | None] = mapped_column(String(255), nullable=True)
     telegram_chat_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
