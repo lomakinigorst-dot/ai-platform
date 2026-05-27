@@ -196,13 +196,13 @@ export default function SettingsTab({ clientId, client, trialActive = false }: {
             <pre className="bg-gray-900 text-green-400 rounded-xl p-5 text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap">
               {widgetData?.embed_code || `<script>
   window.AIPlatformConfig = {
-    apiBase: 'http://194.26.138.166',
+    apiBase: 'http://ai.lomakin-igor.ru',
     domain:  '${client.domain}',
     name:    '${client.assistant_name}',
     triggerDelay: 5000,
   };
 </script>
-<script src="http://194.26.138.166/widget.js" async></script>`}
+<script src="http://ai.lomakin-igor.ru/widget.js" async></script>`}
             </pre>
             <button
               onClick={() => navigator.clipboard.writeText(widgetData?.embed_code ?? '')}

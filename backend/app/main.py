@@ -16,6 +16,7 @@ app = FastAPI(
 
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "http://ai.lomakin-igor.ru",
     f"http://{settings.BASE_DOMAIN}",
     f"https://{settings.BASE_DOMAIN}",
     f"https://www.{settings.BASE_DOMAIN}",

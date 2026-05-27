@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const API_BASE = window.AIPlatformConfig?.apiBase || 'http://194.26.138.166';
+  const API_BASE = window.AIPlatformConfig?.apiBase || 'http://ai.lomakin-igor.ru';
   const DOMAIN = window.AIPlatformConfig?.domain || '';
   const ASSISTANT_NAME = window.AIPlatformConfig?.name || 'Алексей';
   const AVATAR_URL = window.AIPlatformConfig?.avatar || null;

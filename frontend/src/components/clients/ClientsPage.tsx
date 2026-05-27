@@ -125,7 +125,7 @@ export default function ClientsPage() {
     retention_days: (c as any).retention_days ?? null,
     monthly_revenue: (c as any).monthly_revenue ?? 0,
     widget_online: c.status === 'active',
-    demo_chat_url: `http://194.26.138.166/api/v1/chat/demo/${c.domain}`,
+    demo_chat_url: `http://ai.lomakin-igor.ru/api/v1/chat/demo/${c.domain}`,
     trial_active: false,
   }));
 
