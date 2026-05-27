@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import {
-  Bell, Search, LogOut, Settings, ChevronDown,
+  Bell, LogOut, Settings, ChevronDown,
   HelpCircle, MessageCircle, BookOpen, LifeBuoy,
   Zap, Lightbulb, Bug, Gift, Newspaper, Wallet,
 } from 'lucide-react';
@@ -16,13 +16,6 @@ const BLOCK_BUDGETS = [
   { label: 'AI Маркетолог',  color: '#fb923c', days: 28 },
   { label: 'AI Atlas',       color: '#a78bfa', days: 60 },
 ];
-
-// Тёмная тема — тот же цвет что и AIRail
-const BG   = '#1a1535';
-const TEXT = 'rgba(255,255,255,0.75)';
-const MUTED = 'rgba(255,255,255,0.38)';
-const HOVER_BG = 'rgba(255,255,255,0.07)';
-const BORDER   = 'rgba(255,255,255,0.08)';
 
 export default function TopNav() {
   const router = useRouter();
@@ -57,33 +50,17 @@ export default function TopNav() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Дропдауны — белые карточки, т.к. выплывают поверх контента
   const dropdownStyle: React.CSSProperties = {
     background: '#ffffff',
     borderColor: '#e5e7eb',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
   };
 
   return (
     <header
-      className="flex-shrink-0 flex items-center h-12 px-4 gap-3"
-      style={{ background: BG, borderBottom: `1px solid ${BORDER}`, zIndex: 10 }}
+      className="flex-shrink-0 flex items-center h-12 px-4 gap-2"
+      style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f5', zIndex: 10 }}
     >
-      {/* Поиск */}
-      <div
-        className="flex items-center gap-2 flex-1 max-w-[260px] rounded-[8px] px-3 h-8 cursor-text"
-        style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${BORDER}` }}
-      >
-        <Search style={{ width: 13, height: 13, color: MUTED, flexShrink: 0 }} />
-        <span className="text-xs flex-1" style={{ color: MUTED }}>Поиск...</span>
-        <kbd
-          className="text-[10px] rounded px-1"
-          style={{ background: 'rgba(255,255,255,0.08)', color: MUTED, fontFamily: 'inherit' }}
-        >
-          ⌘K
-        </kbd>
-      </div>
-
       <div className="flex-1" />
 
       {/* Баланс */}
@@ -92,15 +69,15 @@ export default function TopNav() {
           onClick={() => { setBalanceOpen(o => !o); setUserMenuOpen(false); setSupportMenuOpen(false); }}
           className="flex items-center gap-1.5 px-3 h-8 rounded-[8px] transition-colors"
           style={{
-            background: DAYS_LEFT < 10 ? 'rgba(239,68,68,0.15)' : 'rgba(167,139,250,0.15)',
-            border: `1px solid ${DAYS_LEFT < 10 ? 'rgba(239,68,68,0.3)' : 'rgba(167,139,250,0.3)'}`,
+            background: DAYS_LEFT < 10 ? '#fef2f2' : '#f5f3ff',
+            border: `1px solid ${DAYS_LEFT < 10 ? '#fecaca' : '#ddd6fe'}`,
           }}
         >
-          <Wallet style={{ width: 13, height: 13, color: DAYS_LEFT < 10 ? '#f87171' : '#c4b5fd' }} />
-          <span className="text-xs font-semibold" style={{ color: DAYS_LEFT < 10 ? '#f87171' : '#c4b5fd' }}>
+          <Wallet style={{ width: 13, height: 13, color: DAYS_LEFT < 10 ? '#ef4444' : '#7c3aed' }} />
+          <span className="text-xs font-semibold" style={{ color: DAYS_LEFT < 10 ? '#ef4444' : '#6b5fd4' }}>
             ₽ {BALANCE.toLocaleString('ru-RU')}
           </span>
-          <span className="text-[10px]" style={{ color: DAYS_LEFT < 10 ? '#f87171' : 'rgba(167,139,250,0.6)' }}>
+          <span className="text-[10px]" style={{ color: DAYS_LEFT < 10 ? '#ef4444' : '#9d8fea' }}>
             · ~{DAYS_LEFT} дн.
           </span>
         </button>
@@ -142,17 +119,15 @@ export default function TopNav() {
 
       {/* Уведомления */}
       <button
-        className="relative flex items-center justify-center w-8 h-8 rounded-[8px] transition-colors"
-        style={{ color: MUTED }}
-        onMouseEnter={e => (e.currentTarget.style.background = HOVER_BG)}
-        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+        className="relative flex items-center justify-center w-8 h-8 rounded-[8px] transition-colors hover:bg-gray-100"
+        style={{ color: '#6b7280' }}
         title="Уведомления"
       >
         <Bell style={{ width: 16, height: 16 }} />
         {notifCount > 0 && (
           <span
             className="absolute top-1 right-1 flex items-center justify-center rounded-full text-white"
-            style={{ width: 14, height: 14, fontSize: 8, fontWeight: 700, background: '#f97316', border: `1.5px solid ${BG}` }}
+            style={{ width: 14, height: 14, fontSize: 8, fontWeight: 700, background: '#f97316', border: '1.5px solid #ffffff' }}
           >
             {notifCount}
           </span>
@@ -163,16 +138,14 @@ export default function TopNav() {
       <div className="relative" ref={supportRef}>
         <button
           onClick={() => { setSupportMenuOpen(o => !o); setUserMenuOpen(false); setBalanceOpen(false); }}
-          className="flex items-center gap-1.5 px-2.5 h-8 rounded-[8px] transition-colors"
-          style={{ color: TEXT }}
-          onMouseEnter={e => (e.currentTarget.style.background = HOVER_BG)}
-          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          className="flex items-center gap-1.5 px-2.5 h-8 rounded-[8px] transition-colors hover:bg-gray-100"
+          style={{ color: '#374151' }}
         >
-          <HelpCircle style={{ width: 15, height: 15, color: MUTED }} />
+          <HelpCircle style={{ width: 15, height: 15, color: '#9ca3af' }} />
           <span className="text-xs">Помощь</span>
           <ChevronDown
             style={{
-              width: 12, height: 12, color: MUTED,
+              width: 12, height: 12, color: '#9ca3af',
               transform: supportMenuOpen ? 'rotate(180deg)' : 'none',
               transition: 'transform 0.15s',
             }}
@@ -202,10 +175,10 @@ export default function TopNav() {
             <div style={{ height: 1, background: '#f3f4f6', margin: '4px 8px' }} />
             <p className="px-3 pt-1 pb-1 text-[9px] font-bold uppercase tracking-widest" style={{ color: '#9ca3af' }}>Сообщество</p>
             {[
-              { icon: Lightbulb, label: 'Предложить идею',       desc: 'Голосование',          href: '/ideas' },
+              { icon: Lightbulb, label: 'Предложить идею',       desc: 'Голосование',            href: '/ideas' },
               { icon: Bug,       label: 'Сообщить о баге',       desc: 'Помоги нам стать лучше', href: '/bugs' },
-              { icon: Newspaper, label: 'Новости и обновления',  desc: 'Что нового',           href: '/news' },
-              { icon: Gift,      label: 'Реферальная программа', desc: 'Зарабатывай с нами',   href: '/referral' },
+              { icon: Newspaper, label: 'Новости и обновления',  desc: 'Что нового',             href: '/news' },
+              { icon: Gift,      label: 'Реферальная программа', desc: 'Зарабатывай с нами',     href: '/referral' },
             ].map(({ icon: Icon, label, desc, href }) => (
               <button key={label} className="w-full flex items-start gap-2.5 px-3 py-2 hover:bg-[#f4f3f8] transition-colors text-left"
                 onClick={() => { router.push(href); setSupportMenuOpen(false); }}>
@@ -220,28 +193,26 @@ export default function TopNav() {
         )}
       </div>
 
-      <div style={{ width: 1, height: 20, background: BORDER, flexShrink: 0 }} />
+      <div style={{ width: 1, height: 20, background: '#e5e7eb', flexShrink: 0 }} />
 
       {/* Аккаунт */}
       <div className="relative" ref={userRef}>
         <button
           onClick={() => { setUserMenuOpen(o => !o); setSupportMenuOpen(false); setBalanceOpen(false); }}
-          className="flex items-center gap-2 px-2 h-8 rounded-[8px] transition-colors"
-          onMouseEnter={e => (e.currentTarget.style.background = HOVER_BG)}
-          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          className="flex items-center gap-2 px-2 h-8 rounded-[8px] transition-colors hover:bg-gray-100"
         >
           <div
             className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
-            style={{ background: 'rgba(167,139,250,0.25)', color: '#c4b5fd' }}
+            style={{ background: '#ede9ff', color: '#6b5fd4' }}
           >
             {initials}
           </div>
-          <span className="text-xs font-medium max-w-[120px] truncate" style={{ color: TEXT }}>
+          <span className="text-xs font-medium max-w-[120px] truncate" style={{ color: '#374151' }}>
             {email}
           </span>
           <ChevronDown
             style={{
-              width: 12, height: 12, color: MUTED,
+              width: 12, height: 12, color: '#9ca3af',
               transform: userMenuOpen ? 'rotate(180deg)' : 'none',
               transition: 'transform 0.15s',
             }}

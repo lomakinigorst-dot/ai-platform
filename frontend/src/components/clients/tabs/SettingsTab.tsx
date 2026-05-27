@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { settingsApi, portalApi, Client } from '@/lib/api';
-import { Bot, Code, Plug, Link, Copy, Check } from 'lucide-react';
+import { Bot, Code, Plug, Link, Copy, Check, Lock, Zap } from 'lucide-react';
 
-export default function SettingsTab({ clientId, client }: { clientId: string; client: Client }) {
+export default function SettingsTab({ clientId, client, trialActive = false }: { clientId: string; client: Client; trialActive?: boolean }) {
   const queryClient = useQueryClient();
   const [section, setSection] = useState<'assistant' | 'embed' | 'integrations' | 'portal'>('assistant');
   const [portalLink, setPortalLink] = useState<string | null>(null);
@@ -179,25 +179,63 @@ export default function SettingsTab({ clientId, client }: { clientId: string; cl
         </div>
       )}
 
-      {/* Embed code */}
+      {/* Embed code — only after Trial activation */}
       {section === 'embed' && (
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <h3 className="font-semibold text-gray-900 mb-2">Код виджета для вставки на сайт</h3>
-          <p className="text-sm text-gray-500 mb-4">
-            Вставьте этот код перед <code className="bg-gray-100 px-1 py-0.5 rounded">&lt;/body&gt;</code> клиентского сайта
-          </p>
-
-          <pre className="bg-gray-900 text-green-400 rounded-xl p-5 text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap">
-            {widgetData?.embed_code || 'Загрузка...'}
-          </pre>
-
-          <button
-            onClick={() => navigator.clipboard.writeText(widgetData?.embed_code ?? '')}
-            className="mt-4 w-full border border-gray-200 text-gray-700 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50"
-          >
-            Скопировать код
-          </button>
-        </div>
+        trialActive ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="font-semibold text-gray-900">Код виджета</h3>
+              <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                style={{ background: '#d1fae5', color: '#065f46' }}>Trial активен</span>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Вставьте код перед{' '}
+              <code className="bg-gray-100 px-1 py-0.5 rounded">&lt;/body&gt;</code>{' '}
+              на сайте клиента. После установки виджет начнёт принимать диалоги.
+            </p>
+            <pre className="bg-gray-900 text-green-400 rounded-xl p-5 text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap">
+              {widgetData?.embed_code || `<script>
+  window.AIPlatformConfig = {
+    apiBase: 'https://api.atlasai.ru',
+    domain:  '${client.domain}',
+    name:    '${client.assistant_name}',
+    triggerDelay: 5000,
+  };
+</script>
+<script src="https://api.atlasai.ru/static/widget/widget.js" async></script>`}
+            </pre>
+            <button
+              onClick={() => navigator.clipboard.writeText(widgetData?.embed_code ?? '')}
+              className="mt-4 w-full border border-gray-200 text-gray-700 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center justify-center gap-2"
+            >
+              <Copy className="w-4 h-4" />
+              Скопировать код
+            </button>
+            <p className="text-xs text-center mt-3" style={{ color: '#9ca3af' }}>
+              Trial действует до {new Date(Date.now() + 14 * 86400000).toLocaleDateString('ru-RU')}
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-xl p-6 text-center">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
+              style={{ background: '#f3f4f6' }}>
+              <Lock className="w-5 h-5 text-gray-400" />
+            </div>
+            <h3 className="font-semibold text-gray-800 mb-2">Код виджета недоступен</h3>
+            <p className="text-sm text-gray-500 mb-5 max-w-xs mx-auto">
+              Код виджета становится доступным после активации Trial.
+              Сначала протестируйте AI через Демо-чат.
+            </p>
+            <button
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white mx-auto"
+              style={{ background: '#6b5fd4' }}
+              onClick={() => alert('Активируйте Trial в заголовке карточки клиента')}
+            >
+              <Zap className="w-4 h-4" />
+              Активировать Trial
+            </button>
+          </div>
+        )
       )}
 
       {/* Portal */}

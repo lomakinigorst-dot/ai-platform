@@ -9,7 +9,7 @@ import {
   UserCheck, BarChart3, Settings, Target, Send, PieChart,
   Briefcase, GitBranch, FileText, DollarSign, Calendar,
   Scale, History, TrendingUp, Phone, Dna, Lock, Zap, Brain,
-  Plus, ChevronRight,
+  Plus, ChevronRight, ScanLine, HelpCircle, CreditCard, UserCog, Map,
 } from 'lucide-react';
 
 interface NavItem    { label: string; href: string; icon: React.ElementType; }
@@ -27,36 +27,45 @@ const blockNavs: Record<string, NavSection[]> = {
         { label: 'Дашборд',      href: '/',            icon: LayoutDashboard },
         { label: 'Клиенты',      href: '/clients',     icon: Users },
         { label: 'Аналитика',    href: '/analytics',   icon: BarChart3 },
+        { label: 'Journey Maps', href: '/journey',     icon: Map },
         { label: 'Интеграции',   href: '/integrations',icon: Zap },
       ],
     },
   ],
   consultant: [
     {
-      title: 'Консультант',
+      title: 'AI Консультант',
       items: [
         { label: 'Дашборд',     href: '/',              icon: LayoutDashboard },
         { label: 'Клиенты',     href: '/clients',       icon: Users },
-        { label: 'Лиды',        href: '/leads',         icon: UserCheck },
-        { label: 'Диалоги',     href: '/conversations', icon: MessageSquare },
+        { label: 'Мои лиды',    href: '/leads',         icon: UserCheck },
+        { label: 'Мои диалоги', href: '/conversations', icon: MessageSquare },
+        { label: 'Аналитика',   href: '/analytics',     icon: BarChart3 },
       ],
     },
     {
-      title: 'Настройка',
+      title: 'Управление',
       items: [
-        { label: 'Аналитика',   href: '/analytics',  icon: BarChart3 },
-        { label: 'Настройки',   href: '/settings',   icon: Settings },
+        { label: 'AI Сканер',     href: '/scanner',  icon: ScanLine },
+        { label: 'Команда',       href: '/team',     icon: UserCog },
+        { label: 'Финансы',       href: '/finance',  icon: CreditCard },
+        { label: 'Journey Maps',  href: '/journey',  icon: Map },
+        { label: 'Настройки',     href: '/settings', icon: Settings },
+        { label: 'Поддержка',     href: '/support',  icon: HelpCircle },
       ],
     },
   ],
   marketer: [
     {
-      title: 'Маркетолог',
+      title: 'AI Маркетолог',
       items: [
-        { label: 'ДНК-анализ',  href: '/marketing',   icon: Dna },
-        { label: 'Рассылки',    href: '/campaigns',   icon: Send },
-        { label: 'Аналитика ЦА',href: '/audience',    icon: PieChart },
-        { label: 'Конкуренты',  href: '/competitors', icon: Target },
+        { label: 'ДНК-анализ',      href: '/marketing',             icon: Dna },
+        { label: 'Кампании',         href: '/marketing/campaigns',   icon: Target },
+        { label: 'Контент',          href: '/marketing/content',     icon: FileText },
+        { label: 'Рассылки',         href: '/marketing/broadcasts',  icon: Send },
+        { label: 'Сегменты',         href: '/marketing/segments',    icon: PieChart },
+        { label: 'AI-генерация',     href: '/marketing/ai',          icon: Zap },
+        { label: 'Лог действий',     href: '/marketing/log',         icon: History },
       ],
     },
   ],

@@ -7,7 +7,8 @@ import { modeLabel } from '@/lib/utils';
 import Link from 'next/link';
 import {
   ArrowLeft, Globe, RefreshCw, ExternalLink,
-  MessageSquare, UserCheck, Database, Settings, BarChart3, TrendingUp
+  MessageSquare, UserCheck, Database, Settings, BarChart3, TrendingUp,
+  PlayCircle, Zap, Check, Copy, ShieldCheck,
 } from 'lucide-react';
 import LeadsTab from './tabs/LeadsTab';
 import KnowledgeTab from './tabs/KnowledgeTab';
@@ -41,6 +42,8 @@ function StatBox({ label, value, sub }: { label: string; value: number | string;
 
 export default function ClientDetailPage({ clientId }: { clientId: string }) {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [trialActive, setTrialActive] = useState(false);
+  const [copied, setCopied] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: client, isLoading } = useQuery({
@@ -142,14 +145,37 @@ export default function ClientDetailPage({ clientId }: { clientId: string }) {
 
           {/* Actions */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Demo chat — always available */}
             <button
-              onClick={() => { navigator.clipboard.writeText(demoUrl); window.open(demoUrl, '_blank'); }}
-              className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl transition-opacity hover:opacity-90"
-              style={{ background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' }}
+              onClick={() => window.open(demoUrl, '_blank')}
+              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-xl transition-opacity hover:opacity-90"
+              style={{ background: '#d1fae5', color: '#065f46', border: '1px solid #a7f3d0' }}
+              title="Открыть демо-чат — тест AI без подключения к сайту"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
-              Демо
+              <PlayCircle className="w-3.5 h-3.5" />
+              Демо-чат
             </button>
+            {/* Activate trial — shows widget code in Settings */}
+            {!trialActive ? (
+              <button
+                onClick={() => {
+                  if (confirm(`Активировать Trial для ${client.name}?\n\nПосле активации клиент получит код виджета и сможет установить его на сайт.\n\nТриал — 14 дней бесплатно.`)) {
+                    setTrialActive(true);
+                  }
+                }}
+                className="flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-xl transition-opacity hover:opacity-90 text-white"
+                style={{ background: '#6b5fd4' }}
+              >
+                <Zap className="w-3.5 h-3.5" />
+                Активировать Trial
+              </button>
+            ) : (
+              <span className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl"
+                style={{ background: '#d1fae5', color: '#065f46', border: '1px solid #a7f3d0' }}>
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Trial активен
+              </span>
+            )}
             <button
               onClick={() => reindexMutation.mutate()}
               disabled={reindexMutation.isPending || client.status === 'indexing'}
@@ -159,7 +185,7 @@ export default function ClientDetailPage({ clientId }: { clientId: string }) {
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${reindexMutation.isPending ? 'animate-spin' : ''}`} />
-              Обновить
+              Обновить БЗ
             </button>
           </div>
         </div>
@@ -204,66 +230,77 @@ export default function ClientDetailPage({ clientId }: { clientId: string }) {
       {/* Tab content */}
       <div className="flex-1 overflow-auto p-6">
         {activeTab === 'overview' && (
-          <div className="max-w-4xl space-y-6">
+          <div className="max-w-4xl space-y-5">
+            {/* Demo chat CTA — prominent */}
+            <div className="rounded-xl p-4 flex items-center gap-4"
+              style={{ background: '#f0fdf4', border: '1px solid #a7f3d0' }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: '#d1fae5' }}>
+                <PlayCircle style={{ width: 20, height: 20, color: '#10b981' }} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold" style={{ color: '#065f46' }}>Демо-чат готов</p>
+                <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>
+                  База знаний проиндексирована. Откройте демо-чат и проверьте, как AI отвечает на вопросы.
+                  Отправьте ссылку клиенту для тестирования.
+                </p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <button
+                  onClick={() => window.open(demoUrl, '_blank')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold text-white"
+                  style={{ background: '#10b981' }}>
+                  <PlayCircle style={{ width: 14, height: 14 }} />
+                  Открыть
+                </button>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(demoUrl); alert('Ссылка скопирована!'); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium border"
+                  style={{ borderColor: '#a7f3d0', color: '#065f46' }}>
+                  <Copy style={{ width: 14, height: 14 }} />
+                  Скопировать ссылку
+                </button>
+              </div>
+            </div>
+
+            {/* Trial activation CTA — if not active */}
+            {!trialActive && (
+              <div className="rounded-xl p-4 flex items-center gap-4"
+                style={{ background: '#faf5ff', border: '1px solid #ddd6fe' }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: '#ede9ff' }}>
+                  <Zap style={{ width: 20, height: 20, color: '#6b5fd4' }} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold" style={{ color: '#3730a3' }}>Следующий шаг — активировать Trial</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>
+                    После активации клиент получит код виджета во вкладке «Настройки виджета» и сможет установить его на сайт.
+                    Trial — 14 дней бесплатно.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (confirm(`Активировать Trial для ${client.name}?\n\nТриал — 14 дней бесплатно. Клиент получит код виджета.`)) {
+                      setTrialActive(true);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold text-white flex-shrink-0"
+                  style={{ background: '#6b5fd4' }}>
+                  <Zap style={{ width: 14, height: 14 }} />
+                  Активировать Trial
+                </button>
+              </div>
+            )}
+
             {/* KPI grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <StatBox label="Диалогов сегодня" value={stats?.conversations_today ?? 0} />
-              <StatBox
-                label="Диалогов за неделю"
-                value={stats?.conversations_week ?? 0}
-                sub={`всего: ${stats?.conversations_total ?? 0}`}
-              />
-              <StatBox
-                label="Лидов"
-                value={stats?.leads_total ?? 0}
-                sub={`новых: ${stats?.leads_new ?? 0}`}
-              />
-              <StatBox
-                label="Чанков БЗ"
-                value={stats?.knowledge_chunks ?? 0}
-                sub={`${client.pages_indexed} страниц`}
-              />
-            </div>
-
-            {/* Widget embed */}
-            <div
-              className="rounded-xl p-5"
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
-            >
-              <h3 className="font-semibold mb-1" style={{ color: 'var(--text)' }}>Код для вставки</h3>
-              <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-                Вставьте перед{' '}
-                <code
-                  className="px-1.5 py-0.5 rounded text-xs"
-                  style={{ background: 'var(--border-light)', color: 'var(--text)' }}
-                >
-                  &lt;/body&gt;
-                </code>{' '}
-                на сайте клиента
-              </p>
-              <pre
-                className="rounded-xl p-4 text-xs overflow-x-auto leading-relaxed"
-                style={{ background: '#0f0f23', color: '#a9dc76' }}
-              >
-{`<script>
-  window.AIPlatformConfig = {
-    apiBase: '${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') ?? 'http://localhost:8000'}',
-    domain:  '${client.domain}',
-    name:    '${client.assistant_name}',
-    triggerDelay: 5000,
-  };
-</script>
-<script src="${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') ?? 'http://localhost:8000'}/static/widget/widget.js" async></script>`}
-              </pre>
-              <button
-                onClick={() => navigator.clipboard.writeText(
-                  `<script>\n  window.AIPlatformConfig = {\n    apiBase: '${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1','') ?? 'http://localhost:8000'}',\n    domain:  '${client.domain}',\n    name:    '${client.assistant_name}',\n    triggerDelay: 5000,\n  };\n</script>\n<script src="${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1','') ?? 'http://localhost:8000'}/static/widget/widget.js" async></script>`
-                )}
-                className="mt-3 text-sm font-medium transition-colors"
-                style={{ color: 'var(--primary)' }}
-              >
-                Скопировать код
-              </button>
+              <StatBox label="Диалогов за неделю" value={stats?.conversations_week ?? 0}
+                sub={`всего: ${stats?.conversations_total ?? 0}`} />
+              <StatBox label="Лидов" value={stats?.leads_total ?? 0}
+                sub={`новых: ${stats?.leads_new ?? 0}`} />
+              <StatBox label="Страниц в БЗ" value={client.pages_indexed}
+                sub={`качество: ${client.scan_quality}%`} />
             </div>
           </div>
         )}
@@ -280,7 +317,7 @@ export default function ClientDetailPage({ clientId }: { clientId: string }) {
           />
         )}
         {activeTab === 'marketing'     && <MarketingTab clientId={clientId} />}
-        {activeTab === 'settings'      && <SettingsTab clientId={clientId} client={client} />}
+        {activeTab === 'settings'      && <SettingsTab clientId={clientId} client={client} trialActive={trialActive} />}
       </div>
     </div>
   );

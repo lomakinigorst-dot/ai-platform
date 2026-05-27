@@ -1,201 +1,225 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { dashboardApi, clientsApi } from '@/lib/api';
-import { formatDate } from '@/lib/utils';
-import Link from 'next/link';
-import {
-  MessageSquare, ChevronDown, ChevronUp, Search, ChevronRight,
-} from 'lucide-react';
+import { MessageSquare, ExternalLink, X, Clock, Check, UserCheck } from 'lucide-react';
+import { PARTNER_WIDGET } from '@/lib/demo-data';
+
+const PARTNER_HAS_WIDGET = true;
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: '#ede9ff' }}>
+        <MessageSquare className="w-8 h-8" style={{ color: '#6b5fd4' }} />
+      </div>
+      <h3 className="text-base font-semibold mb-2" style={{ color: '#111827' }}>Виджет не подключён</h3>
+      <p className="text-sm max-w-sm mb-5" style={{ color: '#9ca3af' }}>
+        Установите виджет Atlas на свой сайт, чтобы здесь отображались диалоги с посетителями.
+      </p>
+      <a href="/settings"
+        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+        style={{ background: '#6b5fd4' }}>
+        <ExternalLink className="w-4 h-4" />
+        Установить виджет
+      </a>
+    </div>
+  );
+}
+
+type Conv = typeof PARTNER_WIDGET.conversations[0];
+
+const DEMO_MESSAGES: Record<string, { role: 'user' | 'ai'; text: string }[]> = {
+  'pc-1': [
+    { role: 'user', text: 'Добрый день! Расскажите о тарифах для агентств' },
+    { role: 'ai',   text: 'Здравствуйте! У нас есть несколько тарифных планов для агентств: Starter (до 5 клиентов), Pro (до 20 клиентов) и Enterprise (без ограничений). Стоимость зависит от количества клиентов и подключённых AI-блоков. Сейчас актуальна скидка 20% при оплате за 3 месяца. Подскажите, сколько у вас клиентов планируется?' },
+    { role: 'user', text: 'У меня около 10 клиентов сейчас, планирую расти до 30' },
+    { role: 'ai',   text: 'Отлично! Для 10 клиентов подойдёт тариф Pro, а при росте до 30 — Enterprise. Я могу записать вас на демонстрацию, где покажем возможности платформы на реальных примерах. Как вас зовут и какой мессенджер предпочитаете?' },
+  ],
+  'pc-2': [
+    { role: 'user', text: 'Сколько клиентских сайтов можно подключить к одному кабинету?' },
+    { role: 'ai',   text: 'В зависимости от тарифа: Starter — до 5 сайтов, Pro — до 20, Enterprise — без ограничений. Каждый сайт получает свой виджет с отдельной базой знаний и настройками AI-консультанта.' },
+    { role: 'user', text: 'А можно ли разным менеджерам давать доступ только к определённым клиентам?' },
+    { role: 'ai',   text: 'Да, это стандартная функция управления командой. Вы можете добавить сотрудников с ролями Manager, Integrator или Sales Manager и настроить доступ к конкретным клиентам или ко всем сразу.' },
+  ],
+};
 
 export default function ConversationsPage() {
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
-  const [clientFilter, setClientFilter] = useState('');
+  const [filter, setFilter] = useState<'all' | 'converted' | 'today' | 'week'>('all');
   const [search, setSearch] = useState('');
+  const [selectedConv, setSelectedConv] = useState<Conv | null>(null);
 
-  const { data: clients } = useQuery({
-    queryKey: ['clients'],
-    queryFn: () => clientsApi.list(),
+  if (!PARTNER_HAS_WIDGET) return <div className="p-6"><EmptyState /></div>;
+
+  const convs = PARTNER_WIDGET.conversations;
+
+  const filtered = convs.filter(c => {
+    if (filter === 'converted') return c.is_lead;
+    if (filter === 'today') {
+      const today = new Date().toDateString();
+      return new Date(c.created_at).toDateString() === today;
+    }
+    if (filter === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return new Date(c.created_at) >= weekAgo;
+    }
+    if (search) return c.preview.toLowerCase().includes(search.toLowerCase());
+    return true;
   });
 
-  const { data: conversations, isLoading } = useQuery({
-    queryKey: ['all-conversations', clientFilter],
-    queryFn: () => dashboardApi.allConversations({
-      client_id: clientFilter || undefined,
-      limit: 200,
-    }),
-  });
-
-  const { data: messages } = useQuery({
-    queryKey: ['messages', expandedClientId, expanded],
-    queryFn: () => dashboardApi.messages(expandedClientId!, expanded!),
-    enabled: !!expanded && !!expandedClientId,
-  });
-
-  const filtered = (conversations ?? []).filter(c => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return c.visitor_id.includes(q) || c.client_name?.toLowerCase().includes(q);
-  });
+  const counts = {
+    all: convs.length,
+    converted: convs.filter(c => c.is_lead).length,
+    today: convs.filter(c => new Date(c.created_at).toDateString() === new Date().toDateString()).length,
+    week: convs.length,
+  };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div
-        className="flex-shrink-0 px-6 py-4 border-b"
-        style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-      >
-        <div className="mb-4">
-          <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Диалоги</h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            {filtered.length} диалог{filtered.length === 1 ? '' : filtered.length < 5 ? 'а' : 'ов'} по всем клиентам
-          </p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              placeholder="Поиск..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9 pr-3 py-2 text-sm rounded-lg border focus:outline-none"
-              style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--text)', width: 200 }}
-            />
-          </div>
-          <select
-            value={clientFilter}
-            onChange={e => setClientFilter(e.target.value)}
-            className="px-3 py-2 text-sm rounded-lg border focus:outline-none"
-            style={{ borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
-          >
-            <option value="">Все клиенты</option>
-            {clients?.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
+      <div className="mb-5">
+        <h1 className="text-xl font-bold" style={{ color: '#111827' }}>Мои диалоги</h1>
+        <p className="text-sm mt-0.5" style={{ color: '#9ca3af' }}>
+          Переписки AI-виджета на{' '}
+          <span className="font-medium" style={{ color: '#6b5fd4' }}>atlasai.ru</span>
+        </p>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-48">
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Загрузка...</p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div
-            className="rounded-xl p-16 text-center max-w-lg mx-auto"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-          >
-            <MessageSquare className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--border)' }} />
-            <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Диалогов нет</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-subtle)' }}>
-              Диалоги появятся когда посетители начнут общаться с виджетом
-            </p>
-          </div>
-        ) : (
-          <div className="max-w-4xl space-y-2">
-            {filtered.map(conv => (
-              <div
-                key={conv.id}
-                className="rounded-xl overflow-hidden"
-                style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
-              >
-                <button
-                  onClick={() => {
-                    if (expanded === conv.id) {
-                      setExpanded(null);
-                      setExpandedClientId(null);
-                    } else {
-                      setExpanded(conv.id);
-                      setExpandedClientId(conv.client_id);
-                    }
-                  }}
-                  className="w-full flex items-center gap-4 px-5 py-4 text-left hover:opacity-90 transition-opacity"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
-                        {conv.visitor_id.slice(0, 12)}...
-                      </span>
-                      {conv.is_lead && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Лид
-                        </span>
-                      )}
-                      <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>
-                        {conv.message_count} сообщ.
-                      </span>
-                      {/* Client badge */}
-                      <Link
-                        href={`/clients/${conv.client_id}`}
-                        onClick={e => e.stopPropagation()}
-                        className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                        style={{ background: '#ede9ff', color: '#6b5fd4' }}
-                      >
-                        {conv.client_name || conv.client_domain}
-                        <ChevronRight className="w-3 h-3" />
-                      </Link>
-                    </div>
-                    <div className="text-xs mt-0.5" style={{ color: 'var(--text-subtle)' }}>
-                      {formatDate(conv.created_at)}
-                      {conv.utm_source && (
-                        <span className="ml-2 px-1.5 py-0.5 rounded text-xs" style={{ background: 'var(--border-light)' }}>
-                          {conv.utm_source}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {expanded === conv.id ? (
-                    <ChevronUp className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
-                  )}
-                </button>
+      {/* KPI row */}
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        {([
+          ['all', 'Всего', counts.all, '#6b5fd4', '#ede9ff'],
+          ['converted', 'В лиды', counts.converted, '#10b981', '#d1fae5'],
+          ['today', 'Сегодня', counts.today, '#3b82f6', '#dbeafe'],
+          ['week', 'За неделю', counts.week, '#f97316', '#ffedd5'],
+        ] as const).map(([f, label, count, color, bg]) => (
+          <button key={f} onClick={() => setFilter(f as any)}
+            className="rounded-xl p-3 text-left transition-all"
+            style={{
+              background: filter === f ? bg : '#fff',
+              border: `1px solid ${filter === f ? color + '44' : '#f0f0f5'}`,
+            }}>
+            <div className="text-xl font-bold" style={{ color }}>{count}</div>
+            <div className="text-xs font-medium" style={{ color: '#6b7280' }}>{label}</div>
+          </button>
+        ))}
+      </div>
 
-                {expanded === conv.id && (
-                  <div
-                    className="border-t p-5 space-y-3"
-                    style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}
-                  >
-                    {!messages ? (
-                      <p className="text-center text-sm py-4" style={{ color: 'var(--text-muted)' }}>Загрузка...</p>
-                    ) : messages.length === 0 ? (
-                      <p className="text-center text-sm py-4" style={{ color: 'var(--text-muted)' }}>Нет сообщений</p>
-                    ) : (
-                      messages.map((msg: { id: string; role: string; content: string }) => (
-                        <div
-                          key={msg.id}
-                          className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className="max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed"
-                            style={msg.role === 'user' ? {
-                              background: 'var(--primary)',
-                              color: '#fff',
-                              borderBottomRightRadius: 4,
-                            } : {
-                              background: 'var(--surface)',
-                              color: 'var(--text)',
-                              border: '1px solid var(--border)',
-                              borderBottomLeftRadius: 4,
-                            }}
-                          >
-                            {msg.content}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+      {/* Search */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Поиск по тексту диалога..."
+          value={search}
+          onChange={e => { setSearch(e.target.value); setFilter('all'); }}
+          className="w-full px-4 py-2 rounded-xl border text-sm outline-none"
+          style={{ borderColor: '#e5e7eb' }}
+          onFocus={e => (e.currentTarget.style.borderColor = '#6b5fd4')}
+          onBlur={e => (e.currentTarget.style.borderColor = '#e5e7eb')}
+        />
+      </div>
+
+      {/* Conversations list */}
+      <div className="space-y-2">
+        {filtered.length === 0 && (
+          <div className="rounded-xl py-10 text-center"
+            style={{ background: '#fff', border: '1px solid #f0f0f5' }}>
+            <p className="text-sm" style={{ color: '#9ca3af' }}>Диалогов нет</p>
           </div>
         )}
+        {filtered.map(conv => (
+          <div key={conv.id}
+            className="rounded-xl px-4 py-3.5 cursor-pointer hover:shadow-md transition-all"
+            style={{ background: '#fff', border: '1px solid #f0f0f5', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+            onClick={() => setSelectedConv(conv)}>
+            <div className="flex items-start gap-3">
+              {/* Avatar */}
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                style={{ background: conv.is_lead ? '#d1fae5' : '#f3f4f6', color: conv.is_lead ? '#10b981' : '#9ca3af' }}>
+                {conv.is_lead ? <UserCheck style={{ width: 15, height: 15 }} /> : <MessageSquare style={{ width: 15, height: 15 }} />}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-xs" style={{ color: '#9ca3af' }}>
+                    {new Date(conv.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span className="text-xs" style={{ color: '#9ca3af' }}>
+                    · {conv.message_count} сообщений
+                  </span>
+                  {conv.utm_source && (
+                    <span className="text-xs px-1.5 py-0.5 rounded"
+                      style={{ background: '#f3f4f6', color: '#9ca3af' }}>
+                      {conv.utm_source}
+                    </span>
+                  )}
+                  {conv.is_lead && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: '#d1fae5', color: '#10b981' }}>
+                      → Лид
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm line-clamp-1" style={{ color: '#374151' }}>{conv.preview}</p>
+              </div>
+
+              <div className="flex-shrink-0">
+                {conv.resolved
+                  ? <Check style={{ width: 14, height: 14, color: '#10b981' }} />
+                  : <Clock style={{ width: 14, height: 14, color: '#9ca3af' }} />
+                }
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
+
+      {/* Dialog modal */}
+      {selectedConv && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.4)' }}
+          onClick={() => setSelectedConv(null)}>
+          <div className="w-full max-w-lg rounded-2xl overflow-hidden"
+            style={{ background: '#fff', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-5 py-4 border-b flex items-center justify-between flex-shrink-0"
+              style={{ borderColor: '#f3f4f6' }}>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: '#111827' }}>Диалог</p>
+                <p className="text-xs" style={{ color: '#9ca3af' }}>
+                  {new Date(selectedConv.created_at).toLocaleString('ru-RU')} · {selectedConv.message_count} сообщений
+                  {selectedConv.is_lead && ' · Конвертирован в лид'}
+                </p>
+              </div>
+              <button onClick={() => setSelectedConv(null)}>
+                <X style={{ width: 18, height: 18, color: '#9ca3af' }} />
+              </button>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-3">
+              {(DEMO_MESSAGES[selectedConv.id] ?? [
+                { role: 'user' as const, text: selectedConv.preview },
+                { role: 'ai' as const, text: 'Здравствуйте! Рад помочь. Уточните, пожалуйста, ваш вопрос подробнее.' },
+              ]).map((msg, i) => (
+                <div key={i}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    className="max-w-[80%] rounded-2xl px-4 py-2.5 text-sm"
+                    style={{
+                      background: msg.role === 'user' ? '#6b5fd4' : '#f3f4f6',
+                      color: msg.role === 'user' ? '#fff' : '#374151',
+                    }}>
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
