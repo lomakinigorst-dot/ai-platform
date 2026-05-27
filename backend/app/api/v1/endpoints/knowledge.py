@@ -16,6 +16,7 @@ class KnowledgeItemOut(BaseModel):
     id: str
     source_url: str | None
     source_type: str
+    folder: str | None
     title: str | None
     content: str
     content_edited: str | None
@@ -30,6 +31,7 @@ class KnowledgeItemUpdate(BaseModel):
 class ManualKnowledgeCreate(BaseModel):
     title: str
     content: str
+    folder: str | None = None
 
 
 @router.get("/clients/{client_id}/items", response_model=list[KnowledgeItemOut])
@@ -58,6 +60,7 @@ async def list_knowledge(
         id=str(i.id),
         source_url=i.source_url,
         source_type=i.source_type,
+        folder=i.folder,
         title=i.title,
         content=i.content,
         content_edited=i.content_edited,
@@ -130,6 +133,7 @@ async def create_knowledge_item(
     item = KnowledgeItem(
         client_id=client_id,
         source_type="manual",
+        folder=body.folder or "Вручную",
         title=body.title,
         content=body.content,
         embedding=embedding,

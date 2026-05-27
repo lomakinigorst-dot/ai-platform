@@ -30,6 +30,9 @@ export interface Client {
   index_progress: number;
   pages_indexed: number;
   pages_total: number;
+  scan_phase: string | null;
+  scan_quality: number;
+  needs_deep_scan: boolean;
   niche: string | null;
   assistant_name: string;
   assistant_mode: AssistantMode;
@@ -91,6 +94,7 @@ export interface KnowledgeItem {
   id: string;
   source_url: string | null;
   source_type: string;
+  folder: string | null;
   title: string | null;
   content: string;
   content_edited: string | null;
@@ -115,6 +119,9 @@ export const clientsApi = {
 
   reindex: (id: string) =>
     api.post(`/clients/${id}/reindex`).then(r => r.data),
+
+  deepScan: (id: string) =>
+    api.post(`/clients/${id}/deep-scan`).then(r => r.data),
 };
 
 export const dashboardApi = {

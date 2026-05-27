@@ -20,6 +20,7 @@ class KnowledgeItem(Base):
     # Источник
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     source_type: Mapped[str] = mapped_column(String(50), default="webpage")  # webpage, pdf, txt, manual
+    folder: Mapped[str | None] = mapped_column(String(200), nullable=True)  # папка в базе знаний
 
     # Содержимое
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)

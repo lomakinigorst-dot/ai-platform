@@ -48,6 +48,9 @@ class Client(Base):
     index_progress: Mapped[float] = mapped_column(Float, default=0.0)  # 0-100%
     pages_indexed: Mapped[int] = mapped_column(Integer, default=0)
     pages_total: Mapped[int] = mapped_column(Integer, default=0)
+    scan_phase: Mapped[str | None] = mapped_column(String(200), nullable=True)   # текущая фаза сканирования
+    scan_quality: Mapped[int] = mapped_column(Integer, default=0)                 # 0-100
+    needs_deep_scan: Mapped[bool] = mapped_column(Boolean, default=False)         # рекомендовать глубокое сканирование
 
     # Автоопределённые данные компании
     niche: Mapped[str | None] = mapped_column(String(50), nullable=True)

@@ -270,7 +270,15 @@ export default function ClientDetailPage({ clientId }: { clientId: string }) {
 
         {activeTab === 'leads'         && <LeadsTab clientId={clientId} />}
         {activeTab === 'conversations' && <ConversationsTab clientId={clientId} />}
-        {activeTab === 'knowledge'     && <KnowledgeTab clientId={clientId} />}
+        {activeTab === 'knowledge'     && (
+          <KnowledgeTab
+            clientId={clientId}
+            scanQuality={client.scan_quality}
+            needsDeepScan={client.needs_deep_scan}
+            isIndexing={client.status === 'indexing'}
+            scanPhase={client.scan_phase}
+          />
+        )}
         {activeTab === 'marketing'     && <MarketingTab clientId={clientId} />}
         {activeTab === 'settings'      && <SettingsTab clientId={clientId} client={client} />}
       </div>

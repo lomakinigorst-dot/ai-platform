@@ -16,6 +16,9 @@ class ClientResponse(BaseModel):
     index_progress: float
     pages_indexed: int
     pages_total: int
+    scan_phase: str | None = None
+    scan_quality: int = 0
+    needs_deep_scan: bool = False
     niche: str | None
     company_description: str | None
     assistant_mode: str

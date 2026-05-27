@@ -8,7 +8,11 @@ from sqlalchemy import select, func
 from app.core.database import get_db
 from app.models import Client, ClientStatus, KnowledgeItem
 from app.api.v1.schemas.client import ClientCreate, ClientResponse, ClientList
-from app.services.crawler import extract_domain, normalize_url, crawl_website, extract_contacts, detect_niche
+from app.services.crawler import (
+    extract_domain, normalize_url, smart_crawl,
+    extract_contacts, detect_niche, _microdata_to_text,
+    SiteUnavailableError, CrawlError,
+)
 from app.services.embeddings import get_embeddings_batch, chunk_text as chunk
 
 router = APIRouter(prefix="/clients", tags=["clients"])
@@ -95,14 +99,37 @@ async def reindex_client(
     client.status = ClientStatus.indexing
     client.index_progress = 0
     client.pages_indexed = 0
+    client.scan_phase = "Запуск..."
+    client.needs_deep_scan = False
     await db.commit()
 
     background_tasks.add_task(index_website, client.id, client.website_url)
+
+
+@router.post("/{client_id}/deep-scan", response_model=ClientResponse)
+async def deep_scan_client(
+    client_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Запустить глубокое сканирование (когда качество первичного скана низкое)."""
+    client = await db.get(Client, client_id)
+    if not client:
+        raise HTTPException(404, "Клиент не найден")
+
+    client.status = ClientStatus.indexing
+    client.index_progress = 0
+    client.pages_indexed = 0
+    client.scan_phase = "Глубокое сканирование..."
+    client.needs_deep_scan = False
+    await db.commit()
+
+    background_tasks.add_task(index_website, client.id, client.website_url, deep=True)
     return client
 
 
-async def index_website(client_id: UUID, url: str):
-    """Фоновая задача: сканирует сайт и строит базу знаний."""
+async def index_website(client_id: UUID, url: str, deep: bool = False):
+    """Фоновая задача: умное фазовое сканирование сайта → база знаний."""
     from app.core.database import AsyncSessionLocal
 
     async with AsyncSessionLocal() as db:
@@ -111,75 +138,101 @@ async def index_website(client_id: UUID, url: str):
             return
 
         try:
-            # 1. Сканируем сайт
-            result = await crawl_website(url, limit=50)
-            pages = result["pages"]
+            # Прогресс-коллбек — сохраняет текущую фазу в scan_phase
+            async def on_progress(phase: str, pct: int):
+                client.index_progress = float(pct)
+                client.scan_phase = phase
+                await db.commit()
 
-            client.pages_total = len(pages)
+            # 1. Умное сканирование
+            from app.services.crawler import deep_crawl
+            crawl_fn = deep_crawl if deep else smart_crawl
+            result = await crawl_fn(url, progress=on_progress)
+            pages = result.pages
+
+            client.pages_total = result.total_urls_found
+            client.scan_quality = result.quality_score
+            client.needs_deep_scan = result.needs_deep_scan
             await db.commit()
 
-            # 2. Определяем нишу и контакты
+            # 2. Нишa и контакты
             client.niche = detect_niche(pages)
             client.company_contacts = extract_contacts(pages)
 
             # 3. Удаляем старую базу знаний
-            old_items = await db.execute(
-                select(KnowledgeItem).where(KnowledgeItem.client_id == client_id)
-            )
-            for item in old_items.scalars():
+            old = await db.execute(select(KnowledgeItem).where(KnowledgeItem.client_id == client_id))
+            for item in old.scalars():
                 await db.delete(item)
             await db.commit()
 
-            # 4. Чункуем и создаём эмбеддинги
-            all_chunks = []
-            sources = []
-            for page in pages:
-                text = page.get("content", "")
-                if not text.strip():
-                    continue
-                for i, ch in enumerate(chunk(text)):
-                    all_chunks.append(ch)
-                    sources.append((page.get("url"), page.get("title"), i))
+            # 4. Собираем чанки: текст страницы + микроразметка
+            all_chunks: list[str] = []
+            meta: list[tuple[str, str, str, int]] = []  # url, title, folder, chunk_i
 
-            # Батчами по 20 чтобы не перегрузить API
+            for page in pages:
+                # a) Основной текст страницы
+                text = page.content.strip()
+                if text:
+                    for i, ch in enumerate(chunk(text)):
+                        all_chunks.append(ch)
+                        meta.append((page.url, page.title, page.folder, i))
+
+                # b) Микроразметка как отдельный чанк в ту же папку
+                micro_text = _microdata_to_text(page.microdata).strip()
+                if micro_text:
+                    folder_micro = f"{page.folder} / Микроразметка"
+                    all_chunks.append(micro_text)
+                    meta.append((page.url, f"[Микроразметка] {page.title}", folder_micro, 0))
+
+            # 5. Эмбеддинги батчами по 20
             batch_size = 20
             indexed = 0
+            total = max(len(all_chunks), 1)
+
             for i in range(0, len(all_chunks), batch_size):
                 batch = all_chunks[i: i + batch_size]
-                batch_sources = sources[i: i + batch_size]
-
+                batch_meta = meta[i: i + batch_size]
                 embeddings = await get_embeddings_batch(batch)
 
-                for ch, src, emb in zip(batch, batch_sources, embeddings):
-                    item = KnowledgeItem(
+                for ch, m, emb in zip(batch, batch_meta, embeddings):
+                    db.add(KnowledgeItem(
                         client_id=client_id,
-                        source_url=src[0],
-                        title=src[1],
+                        source_url=m[0],
+                        title=m[1],
+                        folder=m[2],
                         content=ch,
                         embedding=emb,
-                        chunk_index=src[2],
+                        chunk_index=m[3],
                         token_count=len(ch.split()),
                         source_type="webpage",
-                    )
-                    db.add(item)
+                    ))
 
                 indexed += len(batch)
-                client.pages_indexed = min(indexed // max(len(all_chunks) // len(pages), 1), len(pages))
-                client.index_progress = round(indexed / max(len(all_chunks), 1) * 100, 1)
+                client.index_progress = round(indexed / total * 100, 1)
+                client.pages_indexed = indexed
                 await db.commit()
 
-            # 5. Сканирование готово
+            # 6. Готово
             client.status = ClientStatus.active
             client.index_progress = 100.0
             client.pages_indexed = len(pages)
+            client.scan_phase = "done"
             await db.commit()
+
+        except SiteUnavailableError as e:
+            client.status = ClientStatus.pending
+            client.index_progress = 0.0
+            client.scan_phase = f"error: {e}"
+            await db.commit()
+            return  # не запускаем ДНК-анализ
 
         except Exception as e:
             client.status = ClientStatus.pending
-            client.index_progress = 0
+            client.index_progress = 0.0
+            client.scan_phase = "error"
             await db.commit()
             raise
 
-    # 6. Авто-ДНК-анализ (отдельная сессия, не блокирует статус active)
+    # 7. Авто-ДНК-анализ
     from app.services.marketing_dna import run_dna_analysis
     await run_dna_analysis(client_id)
