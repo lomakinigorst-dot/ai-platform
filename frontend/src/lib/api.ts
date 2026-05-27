@@ -90,6 +90,26 @@ export interface Conversation {
   message_count: number;
 }
 
+export interface AggregatedLead extends Lead {
+  client_id: string;
+  client_name: string;
+  client_domain: string;
+}
+
+export interface AggregatedConversation extends Conversation {
+  client_id: string;
+  client_name: string;
+  client_domain: string;
+}
+
+export interface AnalyticsData {
+  totals: { leads: number; conversations: number; clients: number; active_clients: number };
+  top_by_leads: { id: string; name: string; domain: string; count: number }[];
+  top_by_conversations: { id: string; name: string; domain: string; count: number }[];
+  daily_leads: Record<string, number>;
+  daily_conversations: Record<string, number>;
+}
+
 export interface KnowledgeItem {
   id: string;
   source_url: string | null;
@@ -142,6 +162,15 @@ export const dashboardApi = {
 
   messages: (clientId: string, convId: string) =>
     api.get(`/dashboard/clients/${clientId}/conversations/${convId}/messages`).then(r => r.data),
+
+  allLeads: (params?: { status?: string; client_id?: string; limit?: number }) =>
+    api.get<AggregatedLead[]>('/dashboard/leads', { params }).then(r => r.data),
+
+  allConversations: (params?: { client_id?: string; limit?: number }) =>
+    api.get<AggregatedConversation[]>('/dashboard/conversations', { params }).then(r => r.data),
+
+  analytics: () =>
+    api.get<AnalyticsData>('/dashboard/analytics').then(r => r.data),
 };
 
 export const knowledgeApi = {

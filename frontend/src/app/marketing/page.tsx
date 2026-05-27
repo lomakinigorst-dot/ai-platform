@@ -1,16 +1,12 @@
-import AppShell from '@/components/layout/AppShell';
-import ComingSoon from '@/components/ui/coming-soon';
-import { Target } from 'lucide-react';
+'use client';
 
-export default function MarketingHomePage() {
+import AppShell from '@/components/layout/AppShell';
+import MarketingPageFull from '@/components/marketing/MarketingPageFull';
+
+export default function MarketingRoute() {
   return (
     <AppShell>
-      <ComingSoon
-        title="AI Маркетолог"
-        desc="ДНК-анализ аудитории, персонализированные рассылки и аналитика конкурентов. Lite-версия подключена — страница в разработке."
-        icon={Target}
-        color="#fb923c"
-      />
+      <MarketingPageFull />
     </AppShell>
   );
 }

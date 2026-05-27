@@ -36,6 +36,7 @@ const blockNavs: Record<string, NavSection[]> = {
       title: 'Консультант',
       items: [
         { label: 'Дашборд',     href: '/',              icon: LayoutDashboard },
+        { label: 'Клиенты',     href: '/clients',       icon: Users },
         { label: 'Лиды',        href: '/leads',         icon: UserCheck },
         { label: 'Диалоги',     href: '/conversations', icon: MessageSquare },
       ],
@@ -43,7 +44,6 @@ const blockNavs: Record<string, NavSection[]> = {
     {
       title: 'Настройка',
       items: [
-        { label: 'База знаний', href: '/knowledge',  icon: BookOpen },
         { label: 'Аналитика',   href: '/analytics',  icon: BarChart3 },
         { label: 'Настройки',   href: '/settings',   icon: Settings },
       ],

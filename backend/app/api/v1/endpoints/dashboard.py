@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, desc
 from pydantic import BaseModel
 
 from app.core.database import get_db
@@ -242,6 +242,164 @@ async def get_client_conversations(
             message_count=msg_count or 0,
         ))
     return out
+
+
+@router.get("/leads", response_model=list[dict])
+async def get_all_leads(
+    status: str | None = None,
+    client_id: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+):
+    """Все лиды по всем клиентам агентства."""
+    q = select(Lead, Client.name.label("client_name"), Client.domain.label("client_domain")).join(
+        Client, Lead.client_id == Client.id
+    )
+    if status:
+        q = q.where(Lead.status == status)
+    if client_id:
+        q = q.where(Lead.client_id == client_id)
+    q = q.order_by(desc(Lead.created_at)).limit(limit).offset(offset)
+
+    result = await db.execute(q)
+    rows = result.all()
+    return [
+        {
+            "id": str(r.Lead.id),
+            "created_at": r.Lead.created_at,
+            "name": r.Lead.name,
+            "phone": r.Lead.phone,
+            "email": r.Lead.email,
+            "request_text": r.Lead.request_text,
+            "status": r.Lead.status,
+            "priority": r.Lead.priority,
+            "utm_source": r.Lead.utm_source,
+            "utm_medium": r.Lead.utm_medium,
+            "utm_campaign": r.Lead.utm_campaign,
+            "client_id": str(r.Lead.client_id),
+            "client_name": r.client_name,
+            "client_domain": r.client_domain,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/conversations", response_model=list[dict])
+async def get_all_conversations(
+    client_id: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+):
+    """Все диалоги по всем клиентам агентства."""
+    q = select(
+        Conversation,
+        Client.name.label("client_name"),
+        Client.domain.label("client_domain"),
+    ).join(Client, Conversation.client_id == Client.id)
+    if client_id:
+        q = q.where(Conversation.client_id == client_id)
+    q = q.order_by(desc(Conversation.created_at)).limit(limit).offset(offset)
+
+    result = await db.execute(q)
+    rows = result.all()
+
+    out = []
+    for r in rows:
+        msg_count = await db.scalar(
+            select(func.count(Message.id)).where(Message.conversation_id == r.Conversation.id)
+        )
+        out.append({
+            "id": str(r.Conversation.id),
+            "created_at": r.Conversation.created_at,
+            "visitor_id": r.Conversation.visitor_id,
+            "is_lead": r.Conversation.is_lead,
+            "utm_source": r.Conversation.utm_source,
+            "message_count": msg_count or 0,
+            "client_id": str(r.Conversation.client_id),
+            "client_name": r.client_name,
+            "client_domain": r.client_domain,
+        })
+    return out
+
+
+@router.get("/analytics", response_model=dict)
+async def get_analytics(db: AsyncSession = Depends(get_db)):
+    """Агрегированная аналитика агентства по всем клиентам."""
+    now = datetime.utcnow()
+    week_ago = now - timedelta(days=7)
+
+    # Топ клиентов по лидам
+    top_by_leads = await db.execute(
+        select(Client.id, Client.name, Client.domain, func.count(Lead.id).label("leads_count"))
+        .outerjoin(Lead, Lead.client_id == Client.id)
+        .group_by(Client.id, Client.name, Client.domain)
+        .order_by(desc("leads_count"))
+        .limit(10)
+    )
+
+    # Топ клиентов по диалогам
+    top_by_convs = await db.execute(
+        select(Client.id, Client.name, Client.domain, func.count(Conversation.id).label("conv_count"))
+        .outerjoin(Conversation, Conversation.client_id == Client.id)
+        .group_by(Client.id, Client.name, Client.domain)
+        .order_by(desc("conv_count"))
+        .limit(10)
+    )
+
+    # Динамика за 7 дней (по дням)
+    from sqlalchemy import cast, Date as SADate
+    daily = await db.execute(
+        select(
+            cast(Lead.created_at, SADate).label("day"),
+            func.count(Lead.id).label("leads"),
+        )
+        .where(Lead.created_at >= week_ago)
+        .group_by("day")
+        .order_by("day")
+    )
+    daily_convs = await db.execute(
+        select(
+            cast(Conversation.created_at, SADate).label("day"),
+            func.count(Conversation.id).label("convs"),
+        )
+        .where(Conversation.created_at >= week_ago)
+        .group_by("day")
+        .order_by("day")
+    )
+
+    leads_rows = top_by_leads.all()
+    convs_rows = top_by_convs.all()
+    daily_leads = {str(r.day): r.leads for r in daily.all()}
+    daily_c = {str(r.day): r.convs for r in daily_convs.all()}
+
+    # Общие итоги
+    total_leads = await db.scalar(select(func.count(Lead.id))) or 0
+    total_convs = await db.scalar(select(func.count(Conversation.id))) or 0
+    total_clients = await db.scalar(select(func.count(Client.id))) or 0
+    active_clients = await db.scalar(
+        select(func.count(Client.id)).where(Client.status == ClientStatus.active)
+    ) or 0
+
+    return {
+        "totals": {
+            "leads": total_leads,
+            "conversations": total_convs,
+            "clients": total_clients,
+            "active_clients": active_clients,
+        },
+        "top_by_leads": [
+            {"id": str(r.id), "name": r.name, "domain": r.domain, "count": r.leads_count}
+            for r in leads_rows
+        ],
+        "top_by_conversations": [
+            {"id": str(r.id), "name": r.name, "domain": r.domain, "count": r.conv_count}
+            for r in convs_rows
+        ],
+        "daily_leads": daily_leads,
+        "daily_conversations": daily_c,
+    }
 
 
 @router.get("/clients/{client_id}/conversations/{conv_id}/messages")
