@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aiplatform
+      POSTGRES_USER: aiplatform
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env.prod
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - internal
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://aiplatform:${POSTGRES_PASSWORD}@postgres:5432/aiplatform
+      - REDIS_URL=redis://redis:6379/0
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://${SERVER_IP}/api/v1
+    restart: unless-stopped
+    networks:
+      - internal
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./widget/widget.js:/usr/share/nginx/html/widget.js:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - internal
+
+volumes:
+  postgres_data:
+
+networks:
+  internal:
+    driver: bridge
