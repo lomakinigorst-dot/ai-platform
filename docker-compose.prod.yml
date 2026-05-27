@@ -53,7 +53,7 @@ services:
       - "80:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./widget/widget.js:/usr/share/nginx/html/widget.js:ro
+      - ./widget/src/widget.js:/usr/share/nginx/html/widget.js:ro
     depends_on:
       - frontend
       - backend

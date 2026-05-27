@@ -80,7 +80,7 @@ export default function ClientDetailPage({ clientId }: { clientId: string }) {
     );
   }
 
-  const demoUrl = `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') ?? 'http://localhost:8000'}/api/v1/chat/demo/${client.domain}`;
+  const demoUrl = `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') ?? 'http://194.26.138.166'}/api/v1/chat/demo/${client.domain}`;
 
   return (
     <div className="flex flex-col h-full">

@@ -16,6 +16,7 @@ app = FastAPI(
 
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    f"http://{settings.BASE_DOMAIN}",
     f"https://{settings.BASE_DOMAIN}",
     f"https://www.{settings.BASE_DOMAIN}",
     f"https://*.{settings.BASE_DOMAIN}",
@@ -27,7 +28,8 @@ if settings.ENVIRONMENT == "development":
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    # Виджет устанавливается на любые сайты клиентов — разрешаем любой origin
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
