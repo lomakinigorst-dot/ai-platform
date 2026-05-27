@@ -1,19 +1,25 @@
 """
-Smart phased website crawler.
+Smart phased website crawler with multi-tier scraping strategy.
 
-Phase 1 – Map:       Discover all URLs via Firecrawl /map (fast, no content)
-Phase 2 – Priority:  Scrape main page + standard pages (about/contacts/delivery)
-Phase 3 – Structure: Analyse URL patterns → detect categories/services
-Phase 4 – Categories: Scrape category landing pages + extract JSON-LD microdata
-Phase 5 – Quality:   Score result; flag if deep scan is recommended
+Tier 1 — Direct HTTP (httpx):  fast, free, no quota. Always tried first.
+Tier 2 — Firecrawl scrape:     used only when Tier 1 is blocked (403/429/Cloudflare/CAPTCHA).
+
+Phase pipeline:
+  1. Reachability check (direct HEAD)
+  2. URL discovery (sitemap.xml → main page links → Firecrawl /map as last resort)
+  3. Priority page selection
+  4. Scrape priority pages (Tier 1 → Tier 2 per page)
+  5. Scrape category pages
+  6. Quality scoring
 
 Rules:
-- If site is unreachable → raise SiteUnavailableError immediately, no fallback
-- Never invent data: only what's actually on the site
-- Deep scan is a separate opt-in step, never triggered automatically
+  - SiteUnavailableError → stop immediately, no fallback
+  - Never invent data: only what's actually on the site
+  - Deep scan is a separate opt-in step, never triggered automatically
 """
 
 import asyncio
+import html as html_lib
 import json
 import re
 from dataclasses import dataclass, field
@@ -44,9 +50,9 @@ class CrawlError(Exception):
 class CrawlPage:
     url: str
     title: str
-    content: str          # markdown text
+    content: str          # markdown/plain text
     folder: str           # display name for knowledge base folder
-    microdata: list[dict] = field(default_factory=list)  # JSON-LD items
+    microdata: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -56,7 +62,7 @@ class SmartCrawlResult:
     needs_deep_scan: bool
     total_urls_found: int
     categories: list[str]
-    scan_phases: list[str]    # names of phases completed
+    scan_phases: list[str]
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +80,6 @@ def normalize_url(url: str) -> str:
     return url.rstrip("/")
 
 
-# Priority page patterns → folder name (checked in order, first match wins)
 _PRIORITY_PATTERNS: list[tuple[list[str], str]] = [
     (["kontakty", "contacts", "contact", "svyaz", "svyazatsya", "about-us/contact"], "Контакты"),
     (["o-nas", "o-kompanii", "o-sebe", "about", "about-us", "company", "kompaniya", "o_nas"], "О компании"),
@@ -93,7 +98,6 @@ _CATEGORY_PATTERNS = [
 
 
 def _classify_url(path: str) -> str | None:
-    """Return folder name for a URL path, or None if it doesn't match priorities."""
     path_lower = path.lower().strip("/")
     for patterns, folder in _PRIORITY_PATTERNS:
         for p in patterns:
@@ -108,60 +112,184 @@ def _is_category_url(path: str) -> bool:
 
 
 def _is_leaf_url(path: str) -> bool:
-    """True if path looks like an individual product/page (has numeric id or deep nesting)."""
     parts = [p for p in path.strip("/").split("/") if p]
     if len(parts) >= 3:
         return True
     last = parts[-1] if parts else ""
-    if re.search(r"\d{4,}", last):  # long numeric id
+    if re.search(r"\d{4,}", last):
         return True
     return False
 
 
 # ---------------------------------------------------------------------------
-# Firecrawl API wrappers
+# HTML → text (no BeautifulSoup, no extra dependencies)
+# ---------------------------------------------------------------------------
+
+_REMOVE_TAGS = re.compile(
+    r'<(script|style|nav|footer|header|head|noscript|iframe|svg|form)[^>]*>.*?</\1>',
+    re.DOTALL | re.IGNORECASE,
+)
+_BLOCK_TAGS = re.compile(
+    r'</?(?:p|div|br|li|ul|ol|tr|td|th|h[1-6]|blockquote|pre|section|article|aside|main)[^>]*>',
+    re.IGNORECASE,
+)
+_ALL_TAGS = re.compile(r'<[^>]+>')
+_WHITESPACE = re.compile(r'[ \t]+')
+_NEWLINES = re.compile(r'\n{3,}')
+
+
+def _html_to_text(html: str) -> str:
+    text = _REMOVE_TAGS.sub(' ', html)
+    text = _BLOCK_TAGS.sub('\n', text)
+    text = _ALL_TAGS.sub(' ', text)
+    text = html_lib.unescape(text)
+    text = _WHITESPACE.sub(' ', text)
+    text = _NEWLINES.sub('\n\n', text)
+    return text.strip()
+
+
+def _extract_title_from_html(html: str) -> str:
+    m = re.search(r'<title[^>]*>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
+    if m:
+        return html_lib.unescape(m.group(1)).strip()
+    m = re.search(r'<h1[^>]*>(.*?)</h1>', html, re.IGNORECASE | re.DOTALL)
+    if m:
+        return html_lib.unescape(_ALL_TAGS.sub('', m.group(1))).strip()
+    return ""
+
+
+def _extract_links_from_html(html: str, base_url: str) -> list[str]:
+    """Extract internal links from HTML."""
+    parsed_base = urlparse(base_url)
+    base_netloc = parsed_base.netloc
+
+    hrefs = re.findall(r'href=["\']([^"\'#?]+)["\']', html, re.IGNORECASE)
+    links: list[str] = []
+    seen: set[str] = set()
+
+    for href in hrefs:
+        href = href.strip()
+        if not href or href.startswith(('mailto:', 'tel:', 'javascript:', '#')):
+            continue
+        full = urljoin(base_url, href).rstrip("/")
+        pu = urlparse(full)
+        if pu.netloc != base_netloc:
+            continue
+        if pu.path.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.svg', '.pdf', '.zip', '.css', '.js')):
+            continue
+        if full not in seen:
+            seen.add(full)
+            links.append(full)
+
+    return links
+
+
+# ---------------------------------------------------------------------------
+# Anti-scraping detection
+# ---------------------------------------------------------------------------
+
+_BLOCK_MARKERS = [
+    "cloudflare", "just a moment", "checking your browser",
+    "ddos-guard", "please enable javascript", "captcha",
+    "access denied", "bot detection", "verifying you are human",
+    "enable cookies", "security check",
+]
+
+
+def _is_blocked(status_code: int, content: str) -> bool:
+    if status_code in (403, 429, 503):
+        return True
+    if status_code == 200 and len(content) < 500:
+        # suspiciously short — might be a challenge page
+        lower = content.lower()
+        return any(m in lower for m in _BLOCK_MARKERS)
+    if status_code == 200:
+        lower = content[:3000].lower()
+        return any(m in lower for m in _BLOCK_MARKERS)
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Tier 1 — Direct HTTP scraping
+# ---------------------------------------------------------------------------
+
+async def _direct_fetch(url: str, client: httpx.AsyncClient) -> tuple[int, str]:
+    """Fetch URL directly. Returns (status_code, html_text)."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; SiteIndexBot/1.0)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ru,en;q=0.5",
+    }
+    r = await client.get(url, headers=headers, follow_redirects=True, timeout=15)
+    return r.status_code, r.text
+
+
+async def _direct_scrape_page(url: str, client: httpx.AsyncClient) -> CrawlPage | None:
+    """Tier 1: scrape page directly. Returns None if blocked or error."""
+    try:
+        status, html = await _direct_fetch(url, client)
+        if _is_blocked(status, html):
+            return None  # signal to escalate to Tier 2
+
+        text = _html_to_text(html)
+        if len(text) < 100:
+            return None
+
+        title = _extract_title_from_html(html) or url
+        microdata = _extract_json_ld(html)
+        parsed = urlparse(url)
+        folder = _classify_url(parsed.path) or "Сайт"
+
+        return CrawlPage(url=url, title=title, content=text, folder=folder, microdata=microdata)
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.RemoteProtocolError):
+        return None
+    except Exception:
+        return None
+
+
+async def _direct_map(base_url: str, client: httpx.AsyncClient) -> list[str]:
+    """Tier 1 URL discovery: sitemap.xml → main page links."""
+    urls: list[str] = []
+
+    # Try sitemap.xml
+    for sitemap_path in ["/sitemap.xml", "/sitemap_index.xml", "/sitemap.php"]:
+        try:
+            r = await client.get(base_url + sitemap_path, timeout=10, follow_redirects=True)
+            if r.status_code == 200 and '<loc>' in r.text:
+                locs = re.findall(r'<loc>([^<]+)</loc>', r.text)
+                parsed_base = urlparse(base_url)
+                for loc in locs:
+                    loc = loc.strip()
+                    pu = urlparse(loc)
+                    if pu.netloc == parsed_base.netloc or not pu.netloc:
+                        urls.append(loc.rstrip("/"))
+                if urls:
+                    return list(dict.fromkeys(urls))[:300]
+        except Exception:
+            continue
+
+    # Fall back to scraping main page links
+    try:
+        status, html = await _direct_fetch(base_url, client)
+        if not _is_blocked(status, html):
+            links = _extract_links_from_html(html, base_url)
+            return links[:300]
+    except Exception:
+        pass
+
+    return []
+
+
+# ---------------------------------------------------------------------------
+# Tier 2 — Firecrawl API
 # ---------------------------------------------------------------------------
 
 _FC_BASE = "https://api.firecrawl.dev/v1"
 _HEADERS = lambda: {"Authorization": f"Bearer {settings.FIRECRAWL_API_KEY}"}
 
 
-async def _check_site_reachable(url: str, client: httpx.AsyncClient) -> None:
-    """Quickly HEAD the main page; raise SiteUnavailableError if unreachable."""
-    try:
-        r = await client.head(url, follow_redirects=True, timeout=10)
-        if r.status_code >= 400:
-            raise SiteUnavailableError(
-                f"Сайт вернул статус {r.status_code}. Проверьте URL."
-            )
-    except httpx.TimeoutException:
-        raise SiteUnavailableError("Сайт не отвечает (таймаут). Проверьте URL.")
-    except httpx.ConnectError:
-        raise SiteUnavailableError("Не удалось подключиться к сайту. Проверьте URL.")
-
-
-async def _map_site(base_url: str, client: httpx.AsyncClient) -> list[str]:
-    """Return list of discovered URLs (Firecrawl /map). Fast, no content."""
-    try:
-        r = await client.post(
-            f"{_FC_BASE}/map",
-            headers=_HEADERS(),
-            json={"url": base_url, "limit": 300, "includeSubdomains": False},
-            timeout=30,
-        )
-        r.raise_for_status()
-        data = r.json()
-        return data.get("links", [])
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code == 402:
-            raise CrawlError("Firecrawl: лимит запросов исчерпан")
-        raise CrawlError(f"Firecrawl /map вернул {e.response.status_code}")
-    except Exception as e:
-        raise CrawlError(f"Ошибка при получении карты сайта: {e}")
-
-
-async def _scrape_page(url: str, client: httpx.AsyncClient) -> CrawlPage | None:
-    """Scrape a single page; return None on error (don't crash the whole scan)."""
+async def _firecrawl_scrape_page(url: str, client: httpx.AsyncClient) -> CrawlPage | None:
+    """Tier 2: scrape via Firecrawl (bypasses anti-scraping)."""
     try:
         r = await client.post(
             f"{_FC_BASE}/scrape",
@@ -194,8 +322,44 @@ async def _scrape_page(url: str, client: httpx.AsyncClient) -> CrawlPage | None:
         return None
 
 
-async def _scrape_pages_parallel(urls: list[str], client: httpx.AsyncClient, max_parallel: int = 5) -> list[CrawlPage]:
-    """Scrape multiple pages with bounded concurrency."""
+async def _firecrawl_map(base_url: str, client: httpx.AsyncClient) -> list[str]:
+    """Tier 2 URL discovery via Firecrawl /map."""
+    try:
+        r = await client.post(
+            f"{_FC_BASE}/map",
+            headers=_HEADERS(),
+            json={"url": base_url, "limit": 300, "includeSubdomains": False},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json().get("links", [])
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 402:
+            raise CrawlError("Firecrawl: лимит запросов исчерпан")
+        raise CrawlError(f"Firecrawl /map вернул {e.response.status_code}")
+    except Exception as e:
+        raise CrawlError(f"Ошибка при получении карты сайта: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Multi-tier scraping: Tier 1 → Tier 2 per page
+# ---------------------------------------------------------------------------
+
+async def _scrape_page(url: str, client: httpx.AsyncClient) -> CrawlPage | None:
+    """
+    Try direct HTTP first (Tier 1). If blocked/failed → escalate to Firecrawl (Tier 2).
+    Returns None only if both tiers fail.
+    """
+    page = await _direct_scrape_page(url, client)
+    if page is not None:
+        return page
+    # Tier 1 failed — escalate silently
+    return await _firecrawl_scrape_page(url, client)
+
+
+async def _scrape_pages_parallel(
+    urls: list[str], client: httpx.AsyncClient, max_parallel: int = 5
+) -> list[CrawlPage]:
     sem = asyncio.Semaphore(max_parallel)
 
     async def _bounded(url: str) -> CrawlPage | None:
@@ -207,11 +371,28 @@ async def _scrape_pages_parallel(urls: list[str], client: httpx.AsyncClient, max
 
 
 # ---------------------------------------------------------------------------
+# Site reachability check
+# ---------------------------------------------------------------------------
+
+async def _check_site_reachable(url: str, client: httpx.AsyncClient) -> None:
+    """HEAD the main page; raise SiteUnavailableError if unreachable."""
+    try:
+        r = await client.head(url, follow_redirects=True, timeout=10)
+        if r.status_code >= 400:
+            raise SiteUnavailableError(
+                f"Сайт вернул статус {r.status_code}. Проверьте URL."
+            )
+    except httpx.TimeoutException:
+        raise SiteUnavailableError("Сайт не отвечает (таймаут). Проверьте URL.")
+    except httpx.ConnectError:
+        raise SiteUnavailableError("Не удалось подключиться к сайту. Проверьте URL.")
+
+
+# ---------------------------------------------------------------------------
 # JSON-LD microdata extraction
 # ---------------------------------------------------------------------------
 
 def _extract_json_ld(html: str) -> list[dict]:
-    """Extract all JSON-LD blocks from raw HTML."""
     pattern = re.compile(
         r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
         re.DOTALL | re.IGNORECASE,
@@ -230,7 +411,6 @@ def _extract_json_ld(html: str) -> list[dict]:
 
 
 def _microdata_to_text(items: list[dict]) -> str:
-    """Convert JSON-LD objects to readable text for knowledge base."""
     lines: list[str] = []
     for item in items:
         t = item.get("@type", "")
@@ -272,7 +452,7 @@ def _microdata_to_text(items: list[dict]) -> str:
                 parts.append(f"Адрес: {addr_str}")
             lines.append("\n".join(p for p in parts if p))
 
-        elif t in ("Service",):
+        elif t == "Service":
             name = item.get("name", "")
             desc = item.get("description", "")
             parts = [f"Услуга: {name}" if name else ""]
@@ -280,7 +460,7 @@ def _microdata_to_text(items: list[dict]) -> str:
                 parts.append(f"Описание: {desc}")
             lines.append("\n".join(p for p in parts if p))
 
-        elif t in ("BreadcrumbList",):
+        elif t == "BreadcrumbList":
             crumbs = item.get("itemListElement", [])
             names = [c.get("item", {}).get("name", c.get("name", ""))
                      for c in crumbs if isinstance(c, dict)]
@@ -295,7 +475,6 @@ def _microdata_to_text(items: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 
 def _quality_score(pages: list[CrawlPage]) -> int:
-    """0–100 score. <30 = recommend deep scan."""
     if not pages:
         return 0
     total_chars = sum(len(p.content) for p in pages)
@@ -305,10 +484,10 @@ def _quality_score(pages: list[CrawlPage]) -> int:
     coverage = len(key_folders & folders) / len(key_folders)
 
     score = 0
-    score += min(40, total_chars // 500)       # content volume (max 40)
-    score += min(30, microdata_count * 3)       # structured data (max 30)
-    score += int(coverage * 20)                 # key page coverage (max 20)
-    score += min(10, len(pages))                # breadth (max 10)
+    score += min(40, total_chars // 500)
+    score += min(30, microdata_count * 3)
+    score += int(coverage * 20)
+    score += min(10, len(pages))
     return min(100, score)
 
 
@@ -322,7 +501,7 @@ async def smart_crawl(
 ) -> SmartCrawlResult:
     """
     Smart phased crawl. Raises SiteUnavailableError if site is unreachable.
-    Never fetches data from sources other than the target site.
+    Uses direct HTTP first; escalates to Firecrawl only when blocked.
     """
 
     async def _progress(phase: str, pct: int):
@@ -334,25 +513,31 @@ async def smart_crawl(
 
     async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
 
-        # ── Phase 1: Reachability check ──────────────────────────────────
+        # ── Phase 1: Reachability ─────────────────────────────────────────
         await _progress("Проверка доступности сайта", 5)
         await _check_site_reachable(base_url, client)
         phases_done.append("reachability")
 
-        # ── Phase 2: Map ──────────────────────────────────────────────────
+        # ── Phase 2: URL discovery ────────────────────────────────────────
         await _progress("Получение структуры сайта", 15)
         all_urls: list[str] = []
-        try:
-            all_urls = await _map_site(base_url, client)
-        except CrawlError:
-            all_urls = [base_url]   # fallback: at least scrape main page
+
+        # Tier 1: sitemap.xml / main page links
+        all_urls = await _direct_map(base_url, client)
+
+        if not all_urls:
+            # Tier 2: Firecrawl /map (site may be JS-heavy or have no sitemap)
+            try:
+                all_urls = await _firecrawl_map(base_url, client)
+            except CrawlError:
+                all_urls = [base_url]
+
         phases_done.append("map")
 
         # ── Phase 3: Select priority pages ───────────────────────────────
         await _progress("Выбор ключевых страниц", 25)
-        parsed_base = urlparse(base_url)
 
-        priority_urls: list[str] = [base_url]   # always include main
+        priority_urls: list[str] = [base_url]
         category_urls: list[str] = []
         seen: set[str] = {base_url}
 
@@ -371,13 +556,11 @@ async def smart_crawl(
                 category_urls.append(raw_url)
                 seen.add(raw_url)
 
-        # Limit to avoid burning Firecrawl quota
         priority_urls = priority_urls[:12]
         category_urls = category_urls[:10]
-
         phases_done.append("select")
 
-        # ── Phase 4: Scrape priority pages in parallel ───────────────────
+        # ── Phase 4: Scrape priority pages ───────────────────────────────
         await _progress("Сканирование основных страниц", 40)
         priority_pages = await _scrape_pages_parallel(priority_urls, client, max_parallel=5)
         phases_done.append("priority")
@@ -392,12 +575,11 @@ async def smart_crawl(
 
         all_pages = priority_pages + category_pages
 
-        # ── Phase 6: Detect site categories from URLs ────────────────────
+        # ── Phase 6: Structure analysis ───────────────────────────────────
         await _progress("Анализ структуры", 80)
         detected_categories = _detect_categories(all_urls, base_url)
         phases_done.append("structure")
 
-    # ── Phase 7: Quality scoring ──────────────────────────────────────────
     score = _quality_score(all_pages)
 
     return SmartCrawlResult(
@@ -478,7 +660,6 @@ async def deep_crawl(url: str, progress: Callable | None = None) -> SmartCrawlRe
 # ---------------------------------------------------------------------------
 
 def _detect_categories(urls: list[str], base_url: str) -> list[str]:
-    """Extract top-level category names from URL patterns."""
     categories: dict[str, int] = {}
     for u in urls:
         if not u.startswith(base_url):
