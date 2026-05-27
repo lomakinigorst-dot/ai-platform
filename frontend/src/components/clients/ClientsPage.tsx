@@ -10,7 +10,6 @@ import {
   Search, Plus, Globe, Globe2, MessageSquare, UserCheck,
   DollarSign, Wifi, WifiOff, Clock, AlertCircle, ShoppingCart,
 } from 'lucide-react';
-import { DEMO_CLIENTS } from '@/lib/demo-data';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -119,19 +118,16 @@ export default function ClientsPage() {
     refetchInterval: 10_000,
   });
 
-  // Merge API clients with demo data — API first, demo as fallback
-  const allClients = (apiClients && apiClients.length > 0)
-    ? apiClients.map(c => ({
-        ...c,
-        plan: (c as any).plan ?? 'Новый',
-        plan_color: '#10b981',
-        retention_days: (c as any).retention_days ?? null,
-        monthly_revenue: (c as any).monthly_revenue ?? 0,
-        widget_online: c.status === 'active',
-        demo_chat_url: `https://demo.atlasai.ru/chat/${c.id}`,
-        trial_active: false,
-      }))
-    : DEMO_CLIENTS;
+  const allClients = (apiClients ?? []).map(c => ({
+    ...c,
+    plan: (c as any).plan ?? 'Новый',
+    plan_color: '#10b981',
+    retention_days: (c as any).retention_days ?? null,
+    monthly_revenue: (c as any).monthly_revenue ?? 0,
+    widget_online: c.status === 'active',
+    demo_chat_url: `http://194.26.138.166/api/v1/chat/demo/${c.domain}`,
+    trial_active: false,
+  }));
 
   const filtered = allClients.filter(c => {
     const matchSearch = !search ||

@@ -1,13 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   BarChart2, MessageSquare, UserCheck, TrendingUp, ExternalLink,
-  Smile, Meh, Frown, Globe, Target,
+  Globe, Target,
 } from 'lucide-react';
-import { PARTNER_WIDGET } from '@/lib/demo-data';
-
-const PARTNER_HAS_WIDGET = true;
+import { dashboardApi } from '@/lib/api';
 
 function EmptyState() {
   return (
@@ -89,9 +88,25 @@ function KpiCard({ label, value, color, icon: Icon }: any) {
 export default function AnalyticsPage() {
   const [period, setPeriod] = useState('30');
 
-  if (!PARTNER_HAS_WIDGET) return <div className="p-6"><EmptyState /></div>;
+  const { data: analytics, isLoading } = useQuery({
+    queryKey: ['analytics'],
+    queryFn: () => dashboardApi.analytics(),
+    refetchInterval: 60_000,
+  });
 
-  const maxBar = Math.max(...ANALYTICS.daily);
+  if (isLoading) return (
+    <div className="p-6 flex items-center justify-center h-64">
+      <div className="w-6 h-6 border-2 border-[#6b5fd4] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (!analytics || analytics.totals.conversations === 0) return <div className="p-6"><EmptyState /></div>;
+
+  const dailyData = Object.entries(analytics.daily_conversations).map(([day, count]) => ({ day, count: count as number }));
+  const maxBar = dailyData.length > 0 ? Math.max(...dailyData.map(d => d.count), 1) : 1;
+  const convRate = analytics.totals.conversations > 0
+    ? ((analytics.totals.leads / analytics.totals.conversations) * 100).toFixed(1)
+    : '0';
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -100,7 +115,7 @@ export default function AnalyticsPage() {
         <div>
           <h1 className="text-xl font-bold" style={{ color: '#111827' }}>Аналитика</h1>
           <p className="text-sm mt-0.5" style={{ color: '#9ca3af' }}>
-            Данные виджета на <span className="font-medium" style={{ color: '#6b5fd4' }}>atlasai.ru</span>
+            Все клиенты · реальные данные
           </p>
         </div>
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: '#f3f4f6' }}>
@@ -115,144 +130,66 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Funnel */}
-      <div className="rounded-xl p-5" style={{ background: '#fff', border: '1px solid #f0f0f5' }}>
-        <h2 className="text-sm font-semibold mb-4" style={{ color: '#111827' }}>Воронка</h2>
-        <div className="flex items-end gap-3">
-          {ANALYTICS.funnel.map((step, i) => (
-            <div key={i} className="flex-1 text-center">
-              <div
-                className="rounded-xl mb-2 transition-all"
-                style={{
-                  height: `${Math.max(step.pct * 1.2, 20)}px`,
-                  background: `hsl(${250 - i * 40}, 70%, ${55 + i * 5}%)`,
-                  opacity: 1 - i * 0.15,
-                }}
-              />
-              <div className="text-lg font-bold" style={{ color: '#111827' }}>{step.value.toLocaleString()}</div>
-              <div className="text-xs" style={{ color: '#9ca3af' }}>{step.label}</div>
-              <div className="text-xs font-bold mt-0.5" style={{ color: '#6b5fd4' }}>{step.pct}%</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* KPI grid */}
       <div className="grid grid-cols-3 gap-3">
-        {ANALYTICS.kpis.map(k => <KpiCard key={k.label} {...k} />)}
+        <KpiCard label="Диалогов" value={analytics.totals.conversations} color="#6b5fd4" icon={MessageSquare} />
+        <KpiCard label="Лидов" value={analytics.totals.leads} color="#10b981" icon={UserCheck} />
+        <KpiCard label="Конверсия" value={`${convRate}%`} color="#f97316" icon={TrendingUp} />
+        <KpiCard label="Активных клиентов" value={analytics.totals.active_clients} color="#3b82f6" icon={Globe} />
+        <KpiCard label="Всего клиентов" value={analytics.totals.clients} color="#8b5cf6" icon={Target} />
+        <KpiCard label="Лидов / клиент" value={analytics.totals.clients > 0 ? (analytics.totals.leads / analytics.totals.clients).toFixed(1) : '0'} color="#ef4444" icon={BarChart2} />
       </div>
 
       {/* Activity chart */}
       <div className="rounded-xl p-5" style={{ background: '#fff', border: '1px solid #f0f0f5' }}>
-        <h2 className="text-sm font-semibold mb-4" style={{ color: '#111827' }}>Диалоги по дням</h2>
-        <div className="flex items-end gap-1 h-24">
-          {ANALYTICS.daily.map((v, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1">
-              <div
-                className="w-full rounded-t-sm transition-all"
-                style={{ height: `${(v / maxBar) * 80}px`, background: '#6b5fd4', opacity: 0.7 + (v / maxBar) * 0.3 }}
-              />
-              <span className="text-[9px]" style={{ color: '#d1d5db' }}>{i + 1}</span>
-            </div>
-          ))}
-        </div>
+        <h2 className="text-sm font-semibold mb-4" style={{ color: '#111827' }}>Диалоги за последние 7 дней</h2>
+        {dailyData.length === 0 ? (
+          <p className="text-sm text-center py-6" style={{ color: '#9ca3af' }}>Нет данных за последние 7 дней</p>
+        ) : (
+          <div className="flex items-end gap-2 h-24">
+            {dailyData.map((d, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                <div
+                  className="w-full rounded-t-sm transition-all"
+                  style={{ height: `${Math.max((d.count / maxBar) * 80, 4)}px`, background: '#6b5fd4', opacity: 0.7 + (d.count / maxBar) * 0.3 }}
+                />
+                <span className="text-[9px]" style={{ color: '#d1d5db' }}>{d.day.slice(5)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Two columns: frequent questions + sentiment */}
+      {/* Top clients */}
       <div className="grid grid-cols-2 gap-5">
-        {/* Frequent questions */}
         <div className="rounded-xl p-5" style={{ background: '#fff', border: '1px solid #f0f0f5' }}>
-          <h2 className="text-sm font-semibold mb-4" style={{ color: '#111827' }}>Частые вопросы (Топ-6)</h2>
-          <div className="space-y-3">
-            {ANALYTICS.frequent_questions.map(q => (
-              <div key={q.topic}>
-                <div className="flex justify-between text-xs mb-1">
-                  <span style={{ color: '#374151' }}>{q.topic}</span>
-                  <div className="flex items-center gap-2">
-                    <span style={{ color: q.delta.startsWith('+') ? '#10b981' : q.delta === '0%' ? '#9ca3af' : '#ef4444' }}>{q.delta}</span>
-                    <span className="font-semibold" style={{ color: '#6b5fd4' }}>{q.pct}%</span>
-                  </div>
-                </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
-                  <div className="h-full rounded-full" style={{ width: `${q.pct}%`, background: '#6b5fd4' }} />
-                </div>
+          <h2 className="text-sm font-semibold mb-4" style={{ color: '#111827' }}>Топ по лидам</h2>
+          <div className="space-y-2">
+            {analytics.top_by_leads.length === 0 ? (
+              <p className="text-xs" style={{ color: '#9ca3af' }}>Нет данных</p>
+            ) : analytics.top_by_leads.map((c, i) => (
+              <div key={c.id} className="flex items-center justify-between">
+                <span className="text-sm" style={{ color: '#374151' }}>{c.name || c.domain}</span>
+                <span className="text-sm font-bold" style={{ color: '#6b5fd4' }}>{c.count}</span>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Sentiment */}
         <div className="rounded-xl p-5" style={{ background: '#fff', border: '1px solid #f0f0f5' }}>
-          <h2 className="text-sm font-semibold mb-4" style={{ color: '#111827' }}>Сентимент диалогов</h2>
-          <div className="space-y-3">
-            {[
-              { label: 'Позитивный', pct: ANALYTICS.sentiment.positive, color: '#10b981', icon: Smile },
-              { label: 'Нейтральный', pct: ANALYTICS.sentiment.neutral, color: '#9ca3af', icon: Meh },
-              { label: 'Негативный', pct: ANALYTICS.sentiment.negative, color: '#ef4444', icon: Frown },
-            ].map(s => {
-              const Icon = s.icon;
-              return (
-                <div key={s.label}>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-1.5 text-xs" style={{ color: s.color }}>
-                      <Icon style={{ width: 13, height: 13 }} />
-                      {s.label}
-                    </div>
-                    <span className="text-sm font-bold" style={{ color: s.color }}>{s.pct}%</span>
-                  </div>
-                  <div className="h-2 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
-                    <div className="h-full rounded-full" style={{ width: `${s.pct}%`, background: s.color }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Cities */}
-          <div className="mt-5 pt-4 border-t" style={{ borderColor: '#f3f4f6' }}>
-            <h3 className="text-xs font-semibold mb-3" style={{ color: '#9ca3af' }}>ГЕО — ТОП ГОРОДОВ</h3>
-            <div className="space-y-1.5">
-              {ANALYTICS.cities.map(c => (
-                <div key={c.city} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <Globe style={{ width: 10, height: 10, color: '#9ca3af' }} />
-                    <span style={{ color: '#374151' }}>{c.city}</span>
-                  </div>
-                  <span className="font-medium" style={{ color: '#6b5fd4' }}>{c.pct}%</span>
-                </div>
-              ))}
-            </div>
+          <h2 className="text-sm font-semibold mb-4" style={{ color: '#111827' }}>Топ по диалогам</h2>
+          <div className="space-y-2">
+            {analytics.top_by_conversations.length === 0 ? (
+              <p className="text-xs" style={{ color: '#9ca3af' }}>Нет данных</p>
+            ) : analytics.top_by_conversations.map((c, i) => (
+              <div key={c.id} className="flex items-center justify-between">
+                <span className="text-sm" style={{ color: '#374151' }}>{c.name || c.domain}</span>
+                <span className="text-sm font-bold" style={{ color: '#3b82f6' }}>{c.count}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Traffic sources */}
-      <div className="rounded-xl p-5" style={{ background: '#fff', border: '1px solid #f0f0f5' }}>
-        <h2 className="text-sm font-semibold mb-4" style={{ color: '#111827' }}>Источники трафика</h2>
-        <table className="w-full">
-          <thead>
-            <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
-              {['Источник', 'Диалогов', 'Лидов', 'Конверсия'].map(h => (
-                <th key={h} className="text-left pb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: '#9ca3af' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {ANALYTICS.sources.map((s, i) => (
-              <tr key={s.source} style={{ borderTop: i === 0 ? 'none' : '1px solid #f3f4f6' }}>
-                <td className="py-2.5 text-sm font-medium" style={{ color: '#374151' }}>{s.source}</td>
-                <td className="py-2.5 text-sm" style={{ color: '#111827' }}>{s.dialogs}</td>
-                <td className="py-2.5 text-sm" style={{ color: '#111827' }}>{s.leads}</td>
-                <td className="py-2.5">
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                    style={{ background: '#d1fae5', color: '#10b981' }}>
-                    {s.conv}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }

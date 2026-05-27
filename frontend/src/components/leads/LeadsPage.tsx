@@ -1,13 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   UserCheck, Phone, Mail, MessageSquare, ExternalLink,
-  Clock, LayoutGrid, List, X,
+  Clock, LayoutGrid, List, X, Globe,
 } from 'lucide-react';
-import { PARTNER_WIDGET } from '@/lib/demo-data';
-
-const PARTNER_HAS_WIDGET = true;
+import { dashboardApi, type AggregatedLead } from '@/lib/api';
 
 type LeadStatus = 'new' | 'contacted' | 'closed';
 
@@ -50,11 +49,29 @@ function EmptyState() {
 export default function LeadsPage() {
   const [filter, setFilter] = useState<'all' | LeadStatus>('all');
   const [view, setView] = useState<'list' | 'kanban'>('list');
-  const [selectedLead, setSelectedLead] = useState<typeof PARTNER_WIDGET.leads[0] | null>(null);
+  const [selectedLead, setSelectedLead] = useState<AggregatedLead | null>(null);
+  const queryClient = useQueryClient();
 
-  if (!PARTNER_HAS_WIDGET) return <div className="p-6"><EmptyState /></div>;
+  const { data: leads = [], isLoading } = useQuery({
+    queryKey: ['leads'],
+    queryFn: () => dashboardApi.allLeads(),
+    refetchInterval: 30_000,
+  });
 
-  const leads = PARTNER_WIDGET.leads;
+  const updateStatus = useMutation({
+    mutationFn: ({ leadId, clientId, status }: { leadId: string; clientId: string; status: string }) =>
+      dashboardApi.updateLeadStatus(clientId, leadId, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['leads'] }),
+  });
+
+  if (isLoading) return (
+    <div className="p-6 flex items-center justify-center h-64">
+      <div className="w-6 h-6 border-2 border-[#6b5fd4] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (leads.length === 0) return <div className="p-6"><EmptyState /></div>;
+
   const filtered = filter === 'all' ? leads : leads.filter(l => l.status === filter);
 
   const counts = {
@@ -69,10 +86,9 @@ export default function LeadsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: '#111827' }}>Мои лиды</h1>
+          <h1 className="text-xl font-bold" style={{ color: '#111827' }}>Лиды</h1>
           <p className="text-sm mt-0.5" style={{ color: '#9ca3af' }}>
-            Заявки с вашего виджета на{' '}
-            <span className="font-medium" style={{ color: '#6b5fd4' }}>atlasai.ru</span>
+            Все заявки со всех виджетов клиентов · {leads.length} лидов
           </p>
         </div>
         <div className="flex gap-1 p-1 rounded-lg" style={{ background: '#f3f4f6' }}>
@@ -127,6 +143,11 @@ export default function LeadsPage() {
                     <span className="text-xs flex items-center gap-1" style={{ color: '#9ca3af' }}>
                       <Clock style={{ width: 10, height: 10 }} />
                       {new Date(lead.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <span className="text-xs flex items-center gap-1 px-2 py-0.5 rounded"
+                      style={{ background: '#f0f0f5', color: '#6b5fd4' }}>
+                      <Globe style={{ width: 10, height: 10 }} />
+                      {lead.client_name}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-4 mb-1">

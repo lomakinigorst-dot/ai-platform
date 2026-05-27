@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { MessageSquare, ExternalLink, X, Clock, Check, UserCheck } from 'lucide-react';
-import { PARTNER_WIDGET } from '@/lib/demo-data';
-
-const PARTNER_HAS_WIDGET = true;
+import { useQuery } from '@tanstack/react-query';
+import { MessageSquare, ExternalLink, X, Clock, Check, UserCheck, Globe } from 'lucide-react';
+import { dashboardApi, type AggregatedConversation } from '@/lib/api';
 
 function EmptyState() {
   return (
@@ -26,31 +25,30 @@ function EmptyState() {
   );
 }
 
-type Conv = typeof PARTNER_WIDGET.conversations[0];
-
-const DEMO_MESSAGES: Record<string, { role: 'user' | 'ai'; text: string }[]> = {
-  'pc-1': [
-    { role: 'user', text: 'Добрый день! Расскажите о тарифах для агентств' },
-    { role: 'ai',   text: 'Здравствуйте! У нас есть несколько тарифных планов для агентств: Starter (до 5 клиентов), Pro (до 20 клиентов) и Enterprise (без ограничений). Стоимость зависит от количества клиентов и подключённых AI-блоков. Сейчас актуальна скидка 20% при оплате за 3 месяца. Подскажите, сколько у вас клиентов планируется?' },
-    { role: 'user', text: 'У меня около 10 клиентов сейчас, планирую расти до 30' },
-    { role: 'ai',   text: 'Отлично! Для 10 клиентов подойдёт тариф Pro, а при росте до 30 — Enterprise. Я могу записать вас на демонстрацию, где покажем возможности платформы на реальных примерах. Как вас зовут и какой мессенджер предпочитаете?' },
-  ],
-  'pc-2': [
-    { role: 'user', text: 'Сколько клиентских сайтов можно подключить к одному кабинету?' },
-    { role: 'ai',   text: 'В зависимости от тарифа: Starter — до 5 сайтов, Pro — до 20, Enterprise — без ограничений. Каждый сайт получает свой виджет с отдельной базой знаний и настройками AI-консультанта.' },
-    { role: 'user', text: 'А можно ли разным менеджерам давать доступ только к определённым клиентам?' },
-    { role: 'ai',   text: 'Да, это стандартная функция управления командой. Вы можете добавить сотрудников с ролями Manager, Integrator или Sales Manager и настроить доступ к конкретным клиентам или ко всем сразу.' },
-  ],
-};
-
 export default function ConversationsPage() {
   const [filter, setFilter] = useState<'all' | 'converted' | 'today' | 'week'>('all');
   const [search, setSearch] = useState('');
-  const [selectedConv, setSelectedConv] = useState<Conv | null>(null);
+  const [selectedConv, setSelectedConv] = useState<AggregatedConversation | null>(null);
 
-  if (!PARTNER_HAS_WIDGET) return <div className="p-6"><EmptyState /></div>;
+  const { data: convs = [], isLoading } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: () => dashboardApi.allConversations(),
+    refetchInterval: 30_000,
+  });
 
-  const convs = PARTNER_WIDGET.conversations;
+  const { data: messages = [] } = useQuery({
+    queryKey: ['messages', selectedConv?.id],
+    queryFn: () => dashboardApi.messages(selectedConv!.client_id, selectedConv!.id),
+    enabled: !!selectedConv,
+  });
+
+  if (isLoading) return (
+    <div className="p-6 flex items-center justify-center h-64">
+      <div className="w-6 h-6 border-2 border-[#6b5fd4] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (convs.length === 0) return <div className="p-6"><EmptyState /></div>;
 
   const filtered = convs.filter(c => {
     if (filter === 'converted') return c.is_lead;
@@ -63,7 +61,7 @@ export default function ConversationsPage() {
       weekAgo.setDate(weekAgo.getDate() - 7);
       return new Date(c.created_at) >= weekAgo;
     }
-    if (search) return c.preview.toLowerCase().includes(search.toLowerCase());
+    if (search) return c.client_name.toLowerCase().includes(search.toLowerCase()) || c.visitor_id.toLowerCase().includes(search.toLowerCase());
     return true;
   });
 
@@ -71,17 +69,16 @@ export default function ConversationsPage() {
     all: convs.length,
     converted: convs.filter(c => c.is_lead).length,
     today: convs.filter(c => new Date(c.created_at).toDateString() === new Date().toDateString()).length,
-    week: convs.length,
+    week: convs.filter(c => { const w = new Date(); w.setDate(w.getDate() - 7); return new Date(c.created_at) >= w; }).length,
   };
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-5">
-        <h1 className="text-xl font-bold" style={{ color: '#111827' }}>Мои диалоги</h1>
+        <h1 className="text-xl font-bold" style={{ color: '#111827' }}>Диалоги</h1>
         <p className="text-sm mt-0.5" style={{ color: '#9ca3af' }}>
-          Переписки AI-виджета на{' '}
-          <span className="font-medium" style={{ color: '#6b5fd4' }}>atlasai.ru</span>
+          Все переписки AI-виджетов · {convs.length} диалогов
         </p>
       </div>
 
@@ -161,11 +158,18 @@ export default function ConversationsPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-sm line-clamp-1" style={{ color: '#374151' }}>{conv.preview}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm" style={{ color: '#374151' }}>Посетитель {conv.visitor_id.slice(0, 8)}</p>
+                  <span className="text-xs flex items-center gap-1 px-2 py-0.5 rounded"
+                    style={{ background: '#f0f0f5', color: '#6b5fd4' }}>
+                    <Globe style={{ width: 10, height: 10 }} />
+                    {conv.client_name}
+                  </span>
+                </div>
               </div>
 
               <div className="flex-shrink-0">
-                {conv.resolved
+                {conv.is_lead
                   ? <Check style={{ width: 14, height: 14, color: '#10b981' }} />
                   : <Clock style={{ width: 14, height: 14, color: '#9ca3af' }} />
                 }
@@ -200,10 +204,9 @@ export default function ConversationsPage() {
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
-              {(DEMO_MESSAGES[selectedConv.id] ?? [
-                { role: 'user' as const, text: selectedConv.preview },
-                { role: 'ai' as const, text: 'Здравствуйте! Рад помочь. Уточните, пожалуйста, ваш вопрос подробнее.' },
-              ]).map((msg, i) => (
+              {messages.length === 0 ? (
+                <p className="text-sm text-center py-8" style={{ color: '#9ca3af' }}>Загрузка сообщений...</p>
+              ) : (messages as any[]).map((msg, i) => (
                 <div key={i}
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
@@ -212,7 +215,7 @@ export default function ConversationsPage() {
                       background: msg.role === 'user' ? '#6b5fd4' : '#f3f4f6',
                       color: msg.role === 'user' ? '#fff' : '#374151',
                     }}>
-                    {msg.text}
+                    {msg.content}
                   </div>
                 </div>
               ))}
