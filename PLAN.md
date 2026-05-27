@@ -1,5 +1,5 @@
 # AI Platform — Master Plan
-> Обновлён: 2026-05-27 | Версия: 2.2
+> Обновлён: 2026-05-27 | Версия: 2.3
 > Этот файл — главный источник правды. Читай перед каждой сессией.
 
 ---
@@ -11,14 +11,13 @@
 **Два кабинета:**
 - **Кабинет агентства** (партнёра) — управляет клиентами, видит агрегированную аналитику, настраивает AI-блоки
 - **Кабинет клиента** — /portal/[token] — видит только свои данные (статистика, лиды, ДНК)
-  Это тот же UI, только без вкладки «Клиенты» и без агрегированных дашбордов.
 
 **6 AI-блоков:**
 1. AI-Консультант — виджет на сайт, захват лидов, RAG (основной, в работе)
 2. AI-Маркетолог — ДНК-анализ аудитории, рассылки (ДНК готово, рассылки Phase 2)
 3. AI-Атлас — AI-оркестратор (чат + 61 сценарий по 6 блокам + confirm flow)
 4. AI-HR — воронка найма (Phase 3, под замком)
-5. AI-Финансы — P&L, ДДС: партнёрский вид (выручки, расходы, транзакции) + клиентский вид (блоки, квоты)
+5. AI-Финансы — P&L, ДДС: партнёрский + клиентский вид
 6. AI-Юрист / AI-Продажи (Phase 4, под замком)
 
 ---
@@ -31,7 +30,8 @@ Backend:   Python 3.12 + FastAPI + SQLAlchemy async + Alembic
 DB:        PostgreSQL + pgvector (Docker)
 Cache:     Redis (Docker)
 AI:        DeepSeek API (чат + анализ), OpenRouter (embeddings), Firecrawl (скрапинг tier-2)
-Hosting:   Timeweb Cloud VPS (AI-ATLAS, 91.186.196.137, Ubuntu 24.04, 4GB RAM)
+Hosting:   Timeweb Cloud VPS, 194.26.138.166, Ubuntu 24.04, 4GB RAM
+Domain:    http://ai.lomakin-igor.ru
 ```
 
 ---
@@ -62,37 +62,56 @@ Radius:             12px карточки, 8px кнопки
 
 ## ТЕКУЩЕЕ СОСТОЯНИЕ (2026-05-27)
 
+### ✅ Платформа задеплоена и работает на проде
+
+**Адрес:** http://ai.lomakin-igor.ru
+**Логин:** lomakin.igor.st@gmail.com / Atlas2026!
+**Сервер root:** root / t8Te+y3PoL+L7_ (ssh root@194.26.138.166)
+
+**Обновить на сервере:**
+```bash
+cd /app && git pull origin main
+docker compose -f docker-compose.prod.yml build [service]
+docker compose -f docker-compose.prod.yml up -d [service]
+# миграции:
+docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
+```
+
 ### ✅ Backend (FastAPI)
 - JWT авторизация (AGENT_EMAIL / AGENT_PASSWORD из .env)
 - Клиенты: CRUD, умное сканирование (5-фазный crawler)
-- **Умный сканер (2026-05-27):** Tier 1 (прямой httpx + sitemap.xml) → Tier 2 (Firecrawl только при 403/429/Cloudflare)
+- **Умный сканер:** Tier 1 (httpx + sitemap.xml) → Tier 2 (Firecrawl только при блокировках)
 - **JSON-LD / Schema.org:** извлечение микроданных (Product, Organization, Service)
 - **Оценка качества сканирования 0-100** + рекомендация глубокого сканирования
-- **Папки в базе знаний:** каждый чанк классифицируется в папку (Контакты, Каталог, О компании и др.)
+- **Папки в базе знаний:** каждый чанк классифицируется в папку
 - RAG pipeline: pgvector embeddings через OpenRouter
-- Chat SSE streaming: DeepSeek прямой API → виджет
+- Chat SSE streaming: DeepSeek → виджет
 - ДНК-анализ: 7 шагов маркетинга, автозапуск после сканирования
-- База знаний, лиды, диалоги, email-уведомления о лидах
+- Atlas chat SSE стриминг ✅ (проверен на проде)
+- Клиентский портал (токен), лиды, диалоги, email-уведомления
 - Demo-ссылка: /api/v1/chat/demo/{domain}
-- Atlas chat SSE стриминг
-- Клиентский портал (токен)
+- **Dashboard API:** агрегированные лиды / диалоги / аналитика по всем клиентам
 
 ### ✅ Frontend (Next.js)
 - **AppShell**: AIRail (7 блоков) + BlockSubNav + TopNav
 - **AtlasPage**: чат с историей, SSE, quick chips
 - **Dashboard** (/): KPI-карточки, график, таблица клиентов
-- **ClientsPage** (/clients): поиск, таблица с DNA-бейджами
+- **ClientsPage** (/clients): реальный API, KPI-карточки, таблица
 - **ClientDetailPage** (/clients/[id]): 6 табов (Обзор, Лиды, Диалоги, База знаний, Маркетолог, Настройки)
 - **KnowledgeTab**: чанки по папкам, качество 0-100, баннер глубокого сканирования
+- **LeadsPage** (/leads): реальный API, фильтры, статусы, обновление через useMutation
+- **ConversationsPage** (/conversations): реальный API, KPI-фильтры, диалог-модал с сообщениями
+- **AnalyticsPage** (/analytics): реальный API, KPI-сетка, бар-чарт, топ-клиенты
 - **Портал клиента** (/portal/[token]): статистика, лиды, ДНК — без логина
+- **Embed-код** в SettingsTab → `http://ai.lomakin-igor.ru/widget.js`
 
-### ✅ Новые поля БД (миграции применены 2026-05-27)
-- `knowledge_items.folder` — папка чанка
-- `clients.scan_phase` — текущая фаза сканирования
-- `clients.scan_quality` — оценка качества 0-100
-- `clients.needs_deep_scan` — нужно ли глубокое сканирование
+### ✅ Widget
+- Файл: `http://ai.lomakin-igor.ru/widget.js`
+- SSE стриминг, захват лидов, UTM
+- Default `API_BASE = 'http://ai.lomakin-igor.ru'`
+- CORS: `allow_origin_regex=r"https?://.*"` — работает с любых сайтов клиентов
 
-### 🔑 API ключи (в .env)
+### 🔑 API ключи (в .env.prod на сервере)
 - DeepSeek (sk-bdbff...) — диалоги + анализ
 - OpenRouter (sk-or-v1-...) — embeddings
 - Firecrawl (fc-3d18...) — tier-2 скрапинг
@@ -100,69 +119,24 @@ Radius:             12px карточки, 8px кнопки
 
 ---
 
-## ЧТО ДЕЛАЕМ СЕЙЧАС (ФАЗА 2 — Полный партнёрский кабинет)
+## ЧТО ДЕЛАЕМ ДАЛЬШЕ (ПРИОРИТЕТ)
 
-### Структура партнёрского кабинета (цель)
+### 1. 🔴 Kanban лидов (ПРИОРИТЕТ #1)
+Канбан-воронка внутри карточки клиента — вкладка «Лиды».
+Статусы: `new → contacted → qualified → won / lost`
+Конкуренты: intly.ru, b24u.ru — оба имеют Kanban.
 
-**Блок «Консультант» — подменю:**
-| Страница | URL | Статус |
-|---|---|---|
-| Дашборд | `/` | ✅ готов |
-| Клиенты | `/clients` | ✅ есть, **добавить в меню** |
-| Лиды (все клиенты) | `/leads` | ❌ нужно создать |
-| Диалоги (все клиенты) | `/conversations` | ❌ нужно создать |
-| Аналитика | `/analytics` | ❌ нужно создать |
-| Настройки агентства | `/settings` | ❌ нужно создать |
+### 2. 🟠 Telegram-интеграция для консультанта
+Подключить бот ТГ как канал: посетитель пишет в бот → RAG-ответ → лид в кабинет.
 
-**Карточка клиента `/clients/{id}` — вкладки:**
-| Вкладка | Статус |
-|---|---|
-| Обзор | ✅ готов |
-| Лиды + **Kanban воронка** | ⚠️ без Kanban |
-| Диалоги | ✅ готов |
-| База знаний (с папками) | ✅ готов (новый) |
-| Маркетолог (ДНК) | ✅ готов |
-| Настройки | ✅ готов |
+### 3. 🟡 Страница /marketing — ДНК напрямую
+Сейчас заглушка. Нужна реальная страница: список клиентов → ДНК-анализ → статус шагов.
 
-**Блок «Маркетолог»:**
-| Страница | URL | Статус |
-|---|---|---|
-| ДНК-анализ | `/marketing` | ❌ заглушка → нужна реальная страница |
-| Рассылки | `/campaigns` | Phase 2 |
-| Аналитика ЦА | `/audience` | Phase 2 |
+### 4. 🟡 Создать тестового клиента на проде
+Добавить nt-g.ru через UI, пересканировать, проверить полный flow виджета.
 
-### Очередь задач (в работе прямо сейчас)
-1. Добавить «Клиенты» в меню Консультанта
-2. Создать /leads — агрегированные лиды
-3. Создать /conversations — агрегированные диалоги
-4. Создать /analytics — аналитика агентства
-5. Создать /settings — настройки агентства
-6. Сделать /marketing рабочей (ДНК по клиентам)
-7. Kanban воронка лидов в карточке клиента
-8. Установить Playwright + smoke тесты
-
----
-
-## ДЕПЛОЙ — Timeweb Cloud (ждём поддержку)
-
-**Сервер:** AI-ATLAS, 91.186.196.137, Ubuntu 24.04, 4 ГБ RAM, Standard
-- **Пароль root:** mdk7jgAT,SdxZ7
-- **Статус:** сервер есть, интернет упал из-за неправильной настройки firewall → тикет в поддержку
-- **SSH:** не работает из Claude Code окружения (таймауты) → деплой через web-консоль Timeweb
-
-**Что готово для деплоя (в репо):**
-- `frontend/Dockerfile` — multi-stage standalone Next.js
-- `docker-compose.prod.yml` — prod стек
-- `nginx.conf` — reverse proxy, SSE поддержка
-- Код на GitHub: github.com/lomakinigorst-dot/ai-platform (ветка main)
-
-**Команды для web-консоли Timeweb (когда поддержка починит сеть):**
-```bash
-apt-get update && apt-get install -y docker.io docker-compose-plugin git
-git clone https://github.com/lomakinigorst-dot/ai-platform.git /app
-# создать /app/.env.prod с ключами
-cd /app && docker compose -f docker-compose.prod.yml up -d
-```
+### 5. 🟢 Настройки виджета
+Кастомизация: цвет, аватар, позиция кнопки, приветственное сообщение.
 
 ---
 
@@ -205,7 +179,11 @@ ai-platform/
 ├── PLAN.md                          ← этот файл (главный источник правды)
 ├── progress.md                      ← детальный чеклист по шагам
 ├── .env                             ← API ключи (не коммитить!)
+├── docker-compose.prod.yml          ← prod стек
+├── nginx.conf                       ← reverse proxy + SSE + widget.js static
+├── widget/src/widget.js             ← виджет (vanilla JS)
 ├── backend/app/
+│   ├── main.py                      ← FastAPI app, CORS
 │   ├── api/v1/endpoints/
 │   │   ├── clients.py               ← CRUD + index_website (умный сканер)
 │   │   ├── knowledge.py             ← база знаний CRUD
@@ -213,7 +191,7 @@ ai-platform/
 │   │   ├── portal.py                ← Клиентский портал
 │   │   ├── chat.py                  ← Виджет-чат SSE
 │   │   ├── marketing.py             ← ДНК-анализ
-│   │   └── dashboard.py             ← Статистика
+│   │   └── dashboard.py             ← агрегированная статистика
 │   └── services/
 │       ├── crawler.py               ← Умный сканер (Tier1→Tier2)
 │       ├── ai.py                    ← DeepSeek (stream_dialog, stream_chat)
@@ -227,14 +205,17 @@ ai-platform/
     │   │   ├── AIRail.tsx           ← 7 блоков, hover-popup
     │   │   ├── BlockSubNav.tsx      ← Сайдбар блока + AtlasSubNav
     │   │   └── TopNav.tsx           ← Тёмный хедер
-    │   └── clients/
-    │       ├── ClientDetailPage.tsx ← 6 табов
-    │       └── tabs/
-    │           ├── MarketingTab.tsx
-    │           ├── SettingsTab.tsx
-    │           ├── LeadsTab.tsx
-    │           ├── ConversationsTab.tsx
-    │           └── KnowledgeTab.tsx ← с папками и качеством
+    │   ├── clients/
+    │   │   ├── ClientDetailPage.tsx ← 6 табов
+    │   │   └── tabs/
+    │   │       ├── MarketingTab.tsx
+    │   │       ├── SettingsTab.tsx  ← embed-код виджета
+    │   │       ├── LeadsTab.tsx
+    │   │       ├── ConversationsTab.tsx
+    │   │       └── KnowledgeTab.tsx ← с папками и качеством
+    │   ├── leads/LeadsPage.tsx      ← агрегированные лиды (реальный API)
+    │   ├── conversations/ConversationsPage.tsx  ← реальный API
+    │   └── analytics/AnalyticsPage.tsx          ← реальный API
     └── lib/api.ts                   ← Все API вызовы
 ```
 
@@ -249,7 +230,7 @@ ai-platform/
 | 6 AI-блоков | ❌ | ❌ | ✅ |
 | Умный сканер (Tier1→Tier2) | ❌ | частично | ✅ |
 | Кабинет клиента | ❌ | ✅ | ✅ |
-| Kanban лидов | ✅ | ✅ | в работе |
+| Kanban лидов | ✅ | ✅ | 🔴 в работе |
 | Каналы (WA, VK, TG) | 38 | 5+ | Phase 2 |
 
 **Главный UTP:** единственная платформа с 6 AI-блоками + автосканирование сайта → ДНК-анализ → готовый консультант без ручной настройки.

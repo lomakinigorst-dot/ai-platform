@@ -43,7 +43,7 @@
 - [x] Оценка качества 0-100 + рекомендация глубокого сканирования
 - [x] Глубокое сканирование opt-in (Firecrawl /crawl до 80 страниц)
 - [x] Папки для чанков (Контакты, О компании, Каталог, Доставка и др.)
-- [x] **Новые поля БД + миграции применены:**
+- [x] **Новые поля БД + миграции:**
   - `knowledge_items.folder`
   - `clients.scan_phase`, `scan_quality`, `needs_deep_scan`
 - [x] KnowledgeTab: чанки по папкам, баннер качества, кнопка «Глубокое сканирование»
@@ -53,85 +53,88 @@
 ## ФАЗА 3 — Полный партнёрский кабинет ✅ ГОТОВО (2026-05-27)
 
 ### Demo data + Clients ✅
-- [x] `src/lib/demo-data.ts` — 6 клиентов, 5 лидов, 5 диалогов, 5 членов команды, 4 тикета, PARTNER_WIDGET
+- [x] `src/lib/demo-data.ts` — 6 клиентов, 5 лидов, 5 диалогов, PARTNER_WIDGET
 - [x] ClientsPage — 8 KPI карточек (b24u-стиль), таблица с health%, retention, revenue, plan badge
 - [x] ClientDetailPage — Демо-чат кнопка, Активировать Trial, код виджета только после Trial
 
 ### Новые страницы ✅
 - [x] `/scanner` — AI Scanner: URL инпут, batch, recent scans table с качеством
-- [x] `/team` — Team page: таблица с role, last login, 4 action icons, invite modal
-- [x] `/support` — Support page: форма тикета + история (мои + клиентские)
-- [x] `/finance` — Finance page: партнёрский вид (KPI, расходы, клиентские выручки, транзакции) + клиентский вид (блоки, квоты, биллинг)
+- [x] `/team` — Team page: таблица с role, last login, invite modal
+- [x] `/support` — Support page: форма тикета + история
+- [x] `/finance` — Finance page: партнёрский + клиентский вид
 
-### Исправления Consultant блока ✅
-- [x] `/leads` — только данные виджета партнёра (PARTNER_WIDGET.leads), empty state, default List, toggle Kanban
-- [x] `/conversations` — только виджет партнёра, 4 KPI фильтра, поиск, диалог-модал
-- [x] `/analytics` — только виджет партнёра, воронка, 6 KPI, бар-чарт, сентимент, источники
+### Consultant блок ✅
+- [x] `/leads` — агрегированные лиды, фильтры, обновление статусов
+- [x] `/conversations` — агрегированные диалоги, 4 KPI фильтра, диалог-модал
+- [x] `/analytics` — воронка, 6 KPI, бар-чарт, сентимент, источники
 
 ### Маркетолог полный редизайн ✅
-- [x] ДНК-таб: EditableList (UTPs/Боли/Закрытие), сегменты с барами, анализ конкурентов
-- [x] Диалог подтверждения регенерации + лимит 3/мес
-- [x] Кампании: таблица с channel badges, статус, open rate, leads (🔒 платно)
-- [x] Контент: список постов с каналами, статусами, modal генерации (🔒 платно)
-- [x] Рассылки: каскад Email→TG→WA→VK с объяснением, автосеквенции + 3-шаговый wizard (🔒 платно)
-- [x] Сегменты: авто-сегменты с кнопкой «Рассылка»
-- [x] AI-генерация: чат-интерфейс, quick prompts, кнопка «Запланировать» (🔒 на бесплатном)
-- [x] Лог действий: хронологический список AI+User событий
-- [x] URL-aware вкладки — /marketing/campaigns, /marketing/content и т.д. ведут на нужный таб
-- [x] Создано 6 sub-route файлов для маркетинга
+- [x] ДНК-таб: EditableList (UTPs/Боли/Закрытие), сегменты, конкуренты
+- [x] DnaTab: Competitor scan → UTP suggestions (Применить/Изменить/Отклонить)
+- [x] DnaTab: «Усилить анализ» — multi-URL инпут, AI предлагает улучшенные УТП
+- [x] DnaTab: Сохранить → диалог обновления базы знаний
+- [x] MarketingTab (карточка клиента): редактируемые УТП/Боли/Закрытия + KB dialog
+- [x] Кампании, Контент, Рассылки, Сегменты, AI-ген, Лог (все 7 вкладок)
+
+### Atlas ✅
+- [x] Боковая панель: 6 AI-блоков, 61 сценарий
+- [x] ActionChain UI: цепочка шагов с confirm/done/pending статусами
+- [x] Промо-кампания TG: action chain + подтверждение публикации
 
 ### Journey Maps ✅
-- [x] /journey — карта пути Партнёра и Клиента
-- [x] Блоки: Консультант, Маркетолог, Atlas — по каждому пошаговый путь
-- [x] Каждый шаг: описание, действия, результат (раскрывается по клику)
-- [x] Переключатель Партнёр / Клиент
-- [x] Journey Maps добавлен в BlockSubNav (Consultant + Atlas блоки)
-
-### Atlas обновление ✅
-- [x] Боковая панель: 6 AI-блоков с аккордеоном, 10+ сценариев в каждом (61 сценарий)
-- [x] ActionChain UI: цепочка шагов с confirm/done/pending статусами
-- [x] Confirm flow: кнопки «Подтвердить» / «Пропустить» перед каждым действием
-- [x] Mock-ответы для ключевых сценариев с action chains
-
-### BlockSubNav обновление ✅
-- [x] Добавлены: AI Scanner (/scanner), Team (/team), Finance (/finance), Support (/support)
-- [x] Маркетолог: 7 вкладок (ДНК, Кампании, Контент, Рассылки, Сегменты, AI-ген, Лог)
-
-### Дополнения Фазы 3 ✅ (2026-05-27, продолжение)
-- [x] DnaTab: Competitor scan → UTP suggestions (Применить/Изменить/Отклонить) + KB update offer
-- [x] DnaTab: «Усилить анализ» — multi-URL инпут, AI предлагает улучшенные УТП с Применить/Отклонить
-- [x] DnaTab: Сохранить → проверка значимости (2+ изменений) → диалог обновления базы знаний
-- [x] Atlas: новый сценарий «Создать промо-кампанию для TG» с action chain + подтверждение публикации
-- [x] MarketingTab (карточка клиента): редактируемые УТП/Боли/Закрытия + анализ конкурентов + KB dialog
+- [x] /journey — карта пути Партнёра и Клиента по всем блокам
 
 ---
 
-## ФАЗА 4 — Деплой на Timeweb Cloud
+## ФАЗА 4 — Деплой на Timeweb Cloud ✅ ГОТОВО (2026-05-27)
 
-**Сервер:** AI-ATLAS, 91.186.196.137
-**Статус:** Ждём Timeweb поддержку — на сервере нет интернета (firewall сломал DNS)
-
-- [x] `frontend/Dockerfile` — multi-stage standalone Next.js
-- [x] `docker-compose.prod.yml` — prod стек
-- [x] `nginx.conf` — reverse proxy + SSE
-- [x] Код на GitHub (ветка main, актуален)
-- [ ] Поддержка Timeweb восстанавливает интернет на сервере
-- [ ] Деплой через web-консоль Timeweb
-- [ ] Alembic миграции на прод БД
-- [ ] End-to-end проверка
+- [x] Новый сервер 194.26.138.166 (старый 91.186.196.137 брошен из-за firewall)
+- [x] Docker + docker-compose на сервере
+- [x] 5 контейнеров: postgres, redis, backend, frontend, nginx
+- [x] 5 миграций Alembic применены на проде
+- [x] Исправления при деплое: Badge.tsx case, psycopg2-binary, `/api/v1` relative URL, USING::integer cast
+- [x] Домен `ai.lomakin-igor.ru` настроен (DNS A → 194.26.138.166)
+- [x] Вход: lomakin.igor.st@gmail.com / Atlas2026!
 
 ---
 
-## ФАЗА 5 — После деплоя
+## ФАЗА 5 — Реальные данные + Widget production ✅ ГОТОВО (2026-05-27)
 
-- [ ] Telegram интеграция для консультанта
-- [ ] Настройки виджета: аватар, цвет, позиция
-- [ ] Рассылки (/campaigns) — Маркетолог Phase 2
-- [ ] Каналы: WhatsApp (Wazzup), VK, Авито
-- [ ] Биллинг и тарифы (реальный)
-- [ ] Лендинг (публичный сайт)
+### Block 2 — Реальные данные вместо demo-data ✅
+- [x] `api.ts`: baseURL = `/api/v1` (relative) в браузере → через nginx reverse proxy
+- [x] `ClientsPage`: реальный `clientsApi.list()`, удалён импорт DEMO_CLIENTS
+- [x] `LeadsPage`: реальный `dashboardApi.allLeads()` + useMutation для статусов
+- [x] `ConversationsPage`: реальный `dashboardApi.allConversations()` + `dashboardApi.messages()`
+- [x] `AnalyticsPage`: реальный `dashboardApi.analytics()`, KPI-сетка, бар-чарт, топ-клиенты
+
+### Block 3 — Widget production fix ✅
+- [x] `widget/src/widget.js`: default `API_BASE = 'http://ai.lomakin-igor.ru'`
+- [x] `docker-compose.prod.yml`: nginx volume `./widget/src/widget.js` (было `./widget/widget.js`)
+- [x] `backend/app/main.py`: CORS `allow_origin_regex=r"https?://.*"` — любые сайты клиентов
+- [x] `SettingsTab.tsx`: embed-код → `http://ai.lomakin-igor.ru/widget.js`
+- [x] `ClientDetailPage.tsx`: demoUrl fallback → `ai.lomakin-igor.ru`
+- [x] `http://ai.lomakin-igor.ru/widget.js` → HTTP 200 ✅
+
+### Block 4 — Atlas SSE verification ✅
+- [x] Atlas `POST /api/v1/atlas/chat` через nginx стримит SSE корректно
+- [x] nginx `proxy_buffering off` работает для SSE
+
+### Block 5 — Credentials ✅
+- [x] Логин изменён: lomakin.igor.st@gmail.com / Atlas2026! (в `/app/.env.prod`)
+- [x] `docker compose up -d backend` — контейнер пересоздан, новые env vars загружены
+
+---
+
+## ФАЗА 6 — Следующие задачи (в работе)
+
+- [ ] **Kanban лидов** — воронка в LeadsTab карточки клиента (NEW → CONTACTED → QUALIFIED → WON/LOST)
+- [ ] **Telegram-интеграция** — бот как канал для консультанта
+- [ ] **Страница /marketing** — реальная страница ДНК по клиентам (сейчас заглушка)
+- [ ] **Тестовый клиент на проде** — создать nt-g.ru через UI, пересканировать, проверить виджет end-to-end
+- [ ] **Настройки виджета** — кастомизация: цвет, аватар, позиция
+- [ ] **Playwright smoke тесты** — проверка всех основных страниц
 
 ---
 
 Последнее обновление: 2026-05-27
-Текущий шаг: Фаза 3 — Полный партнёрский кабинет (в работе)
+Текущий шаг: Фаза 6 — Kanban лидов (следующий приоритет)
