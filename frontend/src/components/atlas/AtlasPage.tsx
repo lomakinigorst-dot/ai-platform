@@ -811,7 +811,7 @@ function AtlasPageInner() {
     ));
   };
 
-  const sendMessage = async (text: string, chatId?: string, attachment?: { name: string; type: string }) => {
+  const sendMessage = async (text: string, chatId?: string, attachment?: { name: string; type: string; base64?: string }) => {
     const cid = chatId ?? activeChatId;
     if ((!text && !attachment) || loading || !cid) return;
 
