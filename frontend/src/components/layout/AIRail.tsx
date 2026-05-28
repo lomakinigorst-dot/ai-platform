@@ -138,7 +138,7 @@ export default function AIRail({ expanded, onToggle, activeBlock, onBlockSelect 
         }}
         title={expanded ? 'Свернуть' : 'Открыть AI-блоки'}
       >
-        {/* Иконка Zap — сдвигается на 4px вправо при ховере */}
+        {/* Иконка Zap — всегда на месте, сдвигается только индикатор ниже */}
         <div
           className="flex items-center justify-center flex-shrink-0 rounded-[8px]"
           style={{
@@ -147,8 +147,7 @@ export default function AIRail({ expanded, onToggle, activeBlock, onBlockSelect 
             background: toggleHover || expanded
               ? 'rgba(167,139,250,0.18)'
               : 'rgba(167,139,250,0.08)',
-            transform: toggleHover && !expanded ? 'translateX(4px)' : 'none',
-            transition: 'transform 0.18s ease, background 0.15s',
+            transition: 'background 0.15s',
           }}
         >
           <Zap style={{ width: 16, height: 16, color: '#a78bfa' }} />
@@ -184,7 +183,7 @@ export default function AIRail({ expanded, onToggle, activeBlock, onBlockSelect 
             }}
           >
             <div style={{
-              width: 10,
+              width: 20,
               height: 1.5,
               borderRadius: 1,
               background: toggleHover ? 'rgba(167,139,250,0.75)' : 'rgba(167,139,250,0.3)',

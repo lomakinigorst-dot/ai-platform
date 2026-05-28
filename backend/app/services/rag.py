@@ -15,12 +15,12 @@ async def search_knowledge(
     """Векторный поиск по базе знаний клиента."""
     query_embedding = await get_embedding(query)
 
-    # pgvector cosine similarity search
+    # pgvector cosine similarity search (client KB + global Atlas KB)
     result = await db.execute(
         text("""
             SELECT content, content_edited, 1 - (embedding <=> :embedding) AS similarity
             FROM knowledge_items
-            WHERE client_id = :client_id
+            WHERE (client_id = :client_id OR is_global = true)
               AND embedding IS NOT NULL
             ORDER BY embedding <=> :embedding
             LIMIT :top_k

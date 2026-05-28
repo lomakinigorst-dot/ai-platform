@@ -1,8 +1,13 @@
 import json
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.models import KnowledgeItem
 from app.services.ai import stream_chat
+from app.services.embeddings import get_embedding
 
 router = APIRouter(prefix="/atlas", tags=["atlas"])
 
@@ -41,6 +46,11 @@ class AtlasRequest(BaseModel):
     messages: list[AtlasMessage]
 
 
+class AtlasKBCreate(BaseModel):
+    title: str
+    content: str
+
+
 @router.post("/chat")
 async def atlas_chat(body: AtlasRequest):
     messages = [{"role": "system", "content": ATLAS_SYSTEM}]
@@ -61,3 +71,23 @@ async def atlas_chat(body: AtlasRequest):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.post("/knowledge")
+async def atlas_save_knowledge(body: AtlasKBCreate, db: AsyncSession = Depends(get_db)):
+    """Сохранить ответ Atlas в глобальную базу знаний (доступно всем агентам через RAG)."""
+    embedding = await get_embedding(body.content)
+    item = KnowledgeItem(
+        client_id=None,
+        is_global=True,
+        source_type="atlas",
+        folder="Atlas KB",
+        title=body.title,
+        content=body.content,
+        embedding=embedding,
+        token_count=len(body.content.split()),
+    )
+    db.add(item)
+    await db.commit()
+    await db.refresh(item)
+    return {"id": str(item.id), "ok": True}

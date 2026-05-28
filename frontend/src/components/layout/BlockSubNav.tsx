@@ -115,41 +115,29 @@ const blockNavs: Record<string, NavSection[]> = {
 function AtlasSubNav() {
   const pathname = usePathname();
   const router   = useRouter();
-  const [expanded, setExpanded] = useState<string[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const goAtlas = (q: string) => router.push(`/atlas?q=${encodeURIComponent(q)}`);
-  const toggle  = (id: string) =>
-    setExpanded(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggle  = (id: string) => setExpanded(prev => prev === id ? null : id);
 
   return (
     <div className="flex-1 overflow-y-auto py-2 flex flex-col">
-      {/* Открыть чат */}
-      <div className="px-2 mb-1">
-        <Link
-          href="/atlas"
-          className={cn(
-            'flex items-center gap-2.5 px-3 py-2 rounded-[8px] transition-colors text-sm',
-            pathname === '/atlas'
-              ? 'bg-[#ede9ff] text-[#6b5fd4] font-medium'
-              : 'text-[#374151] hover:bg-[#f4f3f8]'
-          )}
-        >
-          <Brain className="w-4 h-4 flex-shrink-0" style={{ color: pathname === '/atlas' ? '#6b5fd4' : '#9ca3af' }} />
-          Открыть чат
-        </Link>
-      </div>
+      {/* Подсказка */}
+      <p className="px-4 pt-1 pb-2 text-[11px]" style={{ color: '#9ca3af' }}>
+        Выберите сценарий — откроется новый чат в AI Atlas
+      </p>
 
-      <div style={{ height: 1, background: '#f3f4f6', margin: '4px 12px 6px' }} />
+      <div style={{ height: 1, background: '#f3f4f6', margin: '0 12px 6px' }} />
 
-      {/* Сценарии по блокам — аккордеон */}
+      {/* Сценарии по блокам — аккордеон (один открытый) */}
       <p className="px-4 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
         Сценарии
       </p>
 
-      <div className="flex-1 px-2 space-y-0.5">
+      <div className="flex-1 px-2 space-y-0.5 overflow-y-auto">
         {BLOCKS.map(block => {
           const Icon   = block.icon;
-          const isOpen = expanded.includes(block.id);
+          const isOpen = expanded === block.id;
           return (
             <div key={block.id}>
               <button
@@ -175,7 +163,7 @@ function AtlasSubNav() {
                       className="w-full flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-left hover:bg-[#f4f3f8] transition-colors"
                     >
                       <ChevronRight style={{ width: 9, height: 9, color: block.color, flexShrink: 0, marginTop: 1 }} />
-                      <span className="text-[11px] leading-tight truncate" style={{ color: '#6b7280' }}>{s}</span>
+                      <span className="text-[11px] leading-tight" style={{ color: '#6b7280' }}>{s}</span>
                     </button>
                   ))}
                 </div>
@@ -228,20 +216,20 @@ export default function BlockSubNav({ blockId }: BlockSubNavProps) {
       {/* Заголовок блока */}
       <div
         className="flex items-center px-4 h-12 flex-shrink-0"
-        style={{ background: '#1a1535', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        style={{ background: '#ffffff', borderBottom: '1px solid #f0f0f5' }}
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <div
             className="w-7 h-7 rounded-[8px] flex items-center justify-center flex-shrink-0"
-            style={{ background: block.bgColor.replace('0.15', '0.18') }}
+            style={{ background: block.bgColor }}
           >
             <Icon className="w-4 h-4" style={{ color: block.color }} />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold truncate leading-tight" style={{ color: 'rgba(255,255,255,0.88)' }}>
+            <p className="text-xs font-semibold truncate leading-tight" style={{ color: '#111827' }}>
               {block.label}
             </p>
-            <p className="text-[10px] truncate leading-tight" style={{ color: 'rgba(255,255,255,0.35)' }}>
+            <p className="text-[10px] truncate leading-tight" style={{ color: '#9ca3af' }}>
               {block.desc}
             </p>
           </div>

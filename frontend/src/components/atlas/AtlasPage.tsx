@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, Suspense, useCallback } from 'react';
+import { useState, useRef, useEffect, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -251,6 +251,20 @@ function MarkdownMessage({ text, isUser }: { text: string; isUser: boolean }) {
       >
         {text}
       </ReactMarkdown>
+    </div>
+  );
+}
+
+// ─── Toast notification ───────────────────────────────────────────────────────
+
+function Toast({ message }: { message: string }) {
+  return (
+    <div className="fixed top-4 right-4 z-[9999] flex items-center gap-2.5 px-4 py-2.5 rounded-xl"
+      style={{ background: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', border: '1px solid #e5e7eb', animation: 'fadeIn 0.2s ease' }}>
+      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#d1fae5' }}>
+        <Check style={{ width: 11, height: 11, color: '#10b981' }} />
+      </div>
+      <span className="text-sm font-medium" style={{ color: '#111827' }}>{message}</span>
     </div>
   );
 }
@@ -640,8 +654,37 @@ function AtlasPageInner() {
   const [menuId,         setMenuId]         = useState<string | null>(null);
   const [renamingId,     setRenamingId]     = useState<string | null>(null);
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null);
+  const [toast,          setToast]          = useState<string | null>(null);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const bottomRef   = useRef<HTMLDivElement>(null);
+  const processedQ  = useRef<string | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2000);
+  }, []);
+
+  const copyText = useCallback((text: string) => {
+    navigator.clipboard?.writeText(text).catch(() => {});
+    showToast('Скопировано');
+  }, [showToast]);
+
+  const addToKB = useCallback(async (text: string) => {
+    try {
+      const title = text.replace(/[#*`]/g, '').split('\n')[0].slice(0, 100) || 'Atlas KB';
+      await fetch('/api/v1/atlas/knowledge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') ?? ''}`,
+        },
+        body: JSON.stringify({ title, content: text }),
+      });
+      showToast('Добавлено в базу знаний ✓');
+    } catch {
+      showToast('Ошибка сохранения');
+    }
+  }, [showToast]);
 
   // ── Persist helpers ──────────────────────────────────────────────────────────
   const setChats = useCallback((fn: Chat[] | ((p: Chat[]) => Chat[])) => {
@@ -670,12 +713,16 @@ function AtlasPageInner() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeChatId]);
 
-  // Handle ?q= param
+  // Handle ?q= param (fires on every navigation to /atlas?q=...)
   useEffect(() => {
     const q = searchParams.get('q');
-    if (q) { createChat(q); router.replace('/atlas'); }
+    if (q && q !== processedQ.current) {
+      processedQ.current = q;
+      createChat(q);
+      router.replace('/atlas');
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
   const activeChat = chats.find(c => c.id === activeChatId) ?? null;
 
@@ -733,9 +780,15 @@ function AtlasPageInner() {
   };
 
   const toggleFolder = (id: string) => {
-    setFolders(prev => prev.map(f => f.id === id ? { ...f, collapsed: !f.collapsed } : f));
-    if (activeFolderId === id) setActiveFolderId(null);
-    else { setActiveFolderId(id); setActiveChatId(null); }
+    setFolders(prev => {
+      const target = prev.find(f => f.id === id);
+      const willOpen = target?.collapsed !== false;
+      return prev.map(f => ({
+        ...f,
+        collapsed: f.id === id ? !f.collapsed : (willOpen ? true : f.collapsed),
+      }));
+    });
+    // Don't open folder view here — folder view opens only via "Смотреть все"
   };
 
   // ── Messaging ─────────────────────────────────────────────────────────────────
@@ -922,21 +975,21 @@ function AtlasPageInner() {
               <div className="px-2 py-1">
                 {folders.map(folder => {
                   const folderChats = chats.filter(c => c.folderId === folder.id);
-                  const isActive = activeFolderId === folder.id;
+                  const displayed   = folderChats.slice(0, 7);
+                  const hasMore     = folderChats.length > 7;
                   return (
                     <div key={folder.id}>
-                      <div className="group flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-gray-50"
-                        style={{ background: isActive ? '#f5f3ff' : 'transparent' }}>
+                      <div className="group flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-gray-50">
                         <button onClick={() => toggleFolder(folder.id)}
                           className="flex items-center gap-1.5 flex-1 min-w-0">
                           {folder.collapsed
                             ? <ChevronRight style={{ width: 11, height: 11, color: '#9ca3af', flexShrink: 0 }} />
                             : <ChevronDown  style={{ width: 11, height: 11, color: '#9ca3af', flexShrink: 0 }} />
                           }
-                          <FolderOpen style={{ width: 13, height: 13, color: isActive ? '#6b5fd4' : '#9ca3af', flexShrink: 0 }} />
+                          <FolderOpen style={{ width: 13, height: 13, color: '#9ca3af', flexShrink: 0 }} />
                           {renamingFolder === folder.id
                             ? <RenameInput value={folder.name} onDone={v => renameFolder(folder.id, v)} />
-                            : <span className="text-[12px] font-medium truncate" style={{ color: isActive ? '#6b5fd4' : '#374151' }}>{folder.name}</span>
+                            : <span className="text-[12px] font-medium truncate" style={{ color: '#374151' }}>{folder.name}</span>
                           }
                           <span className="text-[10px] ml-auto flex-shrink-0" style={{ color: '#9ca3af' }}>{folderChats.length}</span>
                         </button>
@@ -955,46 +1008,66 @@ function AtlasPageInner() {
                       </div>
 
                       {/* Chats inside folder */}
-                      {!folder.collapsed && folderChats.map(chat => (
-                        <div key={chat.id} className="group relative flex items-center pl-7 pr-1 py-1">
-                          {renamingId === chat.id
-                            ? <RenameInput value={chat.title} onDone={v => { renameChat(chat.id, v); setRenamingId(null); }} />
-                            : (
-                              <>
-                                <button
-                                  onClick={() => { setActiveChatId(chat.id); setActiveFolderId(null); }}
-                                  className="flex-1 min-w-0 text-left px-2 py-1.5 rounded-lg hover:bg-gray-50"
-                                  style={{ background: activeChatId === chat.id ? '#ede9ff' : 'transparent' }}>
-                                  <div className="text-[11px] truncate"
-                                    style={{ color: activeChatId === chat.id ? '#6b5fd4' : '#6b7280' }}>
-                                    {chat.title}
-                                  </div>
-                                  <div className="text-[10px]" style={{ color: '#d1d5db' }}>{formatTime(chat.ts)}</div>
-                                </button>
-                                <div className="relative opacity-0 group-hover:opacity-100 flex-shrink-0">
-                                  <button onClick={() => setMenuId(menuId === chat.id ? null : chat.id)}
-                                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200">
-                                    <MoreHorizontal style={{ width: 11, height: 11, color: '#9ca3af' }} />
-                                  </button>
-                                  {menuId === chat.id && (
-                                    <ContextMenu onClose={() => setMenuId(null)} items={[
-                                      { label: 'Переименовать', icon: Pencil, onClick: () => setRenamingId(chat.id) },
-                                      {
-                                        label: 'В папку', icon: FolderOpen,
-                                        sub: [
-                                          { label: 'Без папки', onClick: () => moveChat(chat.id, null) },
-                                          ...folders.filter(f => f.id !== folder.id).map(f => ({ label: f.name, onClick: () => moveChat(chat.id, f.id) })),
-                                        ],
-                                      },
-                                      { label: 'Удалить', icon: Trash2, danger: true, onClick: () => deleteChat(chat.id) },
-                                    ]} />
-                                  )}
-                                </div>
-                              </>
-                            )
-                          }
-                        </div>
-                      ))}
+                      {!folder.collapsed && (
+                        <>
+                          {folderChats.length === 0 && (
+                            <button
+                              onClick={() => createChat(undefined, folder.id)}
+                              className="w-full text-left pl-8 pr-2 py-2 text-[11px] hover:bg-gray-50 rounded-lg"
+                              style={{ color: '#9ca3af' }}>
+                              + Начать новый чат в этой папке
+                            </button>
+                          )}
+                          {displayed.map(chat => (
+                            <div key={chat.id} className="group relative flex items-center pl-7 pr-1 py-0.5">
+                              {renamingId === chat.id
+                                ? <RenameInput value={chat.title} onDone={v => { renameChat(chat.id, v); setRenamingId(null); }} />
+                                : (
+                                  <>
+                                    <button
+                                      onClick={() => { setActiveChatId(chat.id); setActiveFolderId(null); }}
+                                      className="flex-1 min-w-0 text-left px-2 py-1.5 rounded-lg hover:bg-gray-50"
+                                      style={{ background: activeChatId === chat.id ? '#ede9ff' : 'transparent' }}>
+                                      <div className="text-[11px] truncate"
+                                        style={{ color: activeChatId === chat.id ? '#6b5fd4' : '#6b7280' }}>
+                                        {chat.title}
+                                      </div>
+                                      <div className="text-[10px]" style={{ color: '#d1d5db' }}>{formatTime(chat.ts)}</div>
+                                    </button>
+                                    <div className="relative opacity-0 group-hover:opacity-100 flex-shrink-0">
+                                      <button onClick={() => setMenuId(menuId === chat.id ? null : chat.id)}
+                                        className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200">
+                                        <MoreHorizontal style={{ width: 11, height: 11, color: '#9ca3af' }} />
+                                      </button>
+                                      {menuId === chat.id && (
+                                        <ContextMenu onClose={() => setMenuId(null)} items={[
+                                          { label: 'Переименовать', icon: Pencil, onClick: () => setRenamingId(chat.id) },
+                                          {
+                                            label: 'В папку', icon: FolderOpen,
+                                            sub: [
+                                              { label: 'Без папки', onClick: () => moveChat(chat.id, null) },
+                                              ...folders.filter(f => f.id !== folder.id).map(f => ({ label: f.name, onClick: () => moveChat(chat.id, f.id) })),
+                                            ],
+                                          },
+                                          { label: 'Удалить', icon: Trash2, danger: true, onClick: () => deleteChat(chat.id) },
+                                        ]} />
+                                      )}
+                                    </div>
+                                  </>
+                                )
+                              }
+                            </div>
+                          ))}
+                          {hasMore && (
+                            <button
+                              onClick={() => { setActiveFolderId(folder.id); setActiveChatId(null); }}
+                              className="w-full text-left pl-8 pr-2 py-1.5 text-[11px] hover:bg-gray-50 rounded-lg"
+                              style={{ color: '#6b5fd4' }}>
+                              Смотреть все ({folderChats.length}) →
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
                   );
                 })}
@@ -1054,14 +1127,6 @@ function AtlasPageInner() {
         )}
       </div>
 
-      {/* Footer: Сохранённые */}
-      <div className="border-t p-2 flex-shrink-0" style={{ borderColor: '#f3f4f6' }}>
-        <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg opacity-50 cursor-not-allowed">
-          <Plus style={{ width: 13, height: 13, color: '#9ca3af' }} />
-          <span className="text-xs" style={{ color: '#9ca3af' }}>Сохранённые</span>
-        </div>
-        <p className="text-[10px] px-2.5 pb-1" style={{ color: '#d1d5db' }}>Сохраняйте часто используемые задачи</p>
-      </div>
     </div>
   );
 
@@ -1123,11 +1188,21 @@ function AtlasPageInner() {
       <div className="flex-shrink-0 flex items-center justify-between px-5 h-11"
         style={{ borderBottom: '1px solid #e5e7eb', background: '#fff' }}>
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-xs flex-shrink-0" style={{ color: '#9ca3af' }}>AI Atlas</span>
+          <button
+            onClick={() => { setActiveChatId(null); setActiveFolderId(null); }}
+            className="text-xs flex-shrink-0 hover:underline"
+            style={{ color: '#6b5fd4' }}>
+            AI Atlas
+          </button>
           {activeChatFolder && (
             <>
               <ChevronRight style={{ width: 11, height: 11, color: '#d1d5db', flexShrink: 0 }} />
-              <span className="text-xs flex-shrink-0" style={{ color: '#9ca3af' }}>{activeChatFolder.name}</span>
+              <button
+                onClick={() => { setActiveFolderId(activeChatFolder.id); setActiveChatId(null); }}
+                className="text-xs flex-shrink-0 hover:underline"
+                style={{ color: '#6b5fd4' }}>
+                {activeChatFolder.name}
+              </button>
             </>
           )}
           <ChevronRight style={{ width: 11, height: 11, color: '#d1d5db', flexShrink: 0 }} />
@@ -1189,21 +1264,21 @@ function AtlasPageInner() {
               )}
               {/* Message actions */}
               <div className={`flex items-center gap-1.5 mt-1 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity select-none"
+                <span className="text-[10px] select-none"
                   style={{ color: '#9ca3af' }}>
                   {formatTime(msg.ts)}
                 </span>
                 <button
-                  onClick={() => navigator.clipboard?.writeText(msg.text).catch(() => {})}
-                  className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-100"
+                  onClick={() => copyText(msg.text)}
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-100"
                   title="Копировать">
                   <Copy style={{ width: 11, height: 11, color: '#9ca3af' }} />
                 </button>
                 {msg.role === 'atlas' && (
                   <button
-                    className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-100"
+                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-100"
                     title="Добавить в базу знаний"
-                    onClick={() => alert('Скоро: добавление в базу знаний агента')}>
+                    onClick={() => addToKB(msg.text)}>
                     <BookOpen style={{ width: 11, height: 11, color: '#9ca3af' }} />
                   </button>
                 )}
@@ -1246,10 +1321,12 @@ function AtlasPageInner() {
   const activeFolder = folders.find(f => f.id === activeFolderId);
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <>
+    {toast && <Toast message={toast} />}
+    <div className="flex h-full">
       {sidebar}
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0">
         {activeChatId && chatView}
         {!activeChatId && activeFolderId && activeFolder && (
           <FolderView
@@ -1266,6 +1343,7 @@ function AtlasPageInner() {
         {!activeChatId && !activeFolderId && startPage}
       </div>
     </div>
+    </>
   );
 }
 
