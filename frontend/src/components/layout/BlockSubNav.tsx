@@ -1,15 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { AI_BLOCKS } from './AIRail';
+import { BLOCKS } from '@/components/atlas/AtlasPage';
 import {
-  LayoutDashboard, Users, MessageSquare, BookOpen,
+  LayoutDashboard, Users, MessageSquare,
   UserCheck, BarChart3, Settings, Target, Send, PieChart,
   Briefcase, GitBranch, FileText, DollarSign, Calendar,
   Scale, History, TrendingUp, Phone, Dna, Lock, Zap, Brain,
-  Plus, ChevronRight, ScanLine, HelpCircle, CreditCard, UserCog, Map,
+  Plus, ChevronRight, ChevronDown, ScanLine, HelpCircle,
+  CreditCard, UserCog, Map,
 } from 'lucide-react';
 
 interface NavItem    { label: string; href: string; icon: React.ElementType; }
@@ -108,115 +111,89 @@ const blockNavs: Record<string, NavSection[]> = {
   ],
 };
 
-// Быстрые действия для Atlas — группированные по AI-блокам
-const ATLAS_QUICK = [
-  {
-    blockId: 'marketer', label: 'AI Маркетолог', color: '#fb923c', status: 'lite',
-    actions: ['Написать пост для соцсетей', 'ДНК-анализ аудитории', 'Создать рассылку'],
-  },
-  {
-    blockId: 'consultant', label: 'AI Консультант', color: '#60a5fa', status: 'pro',
-    actions: ['Настроить базу знаний', 'Просмотреть диалоги', 'Анализ лидов'],
-  },
-  {
-    blockId: 'hr',      label: 'AI HR',       color: '#34d399', status: 'locked', actions: [],
-  },
-  {
-    blockId: 'finance', label: 'AI Финансы',  color: '#fbbf24', status: 'locked', actions: [],
-  },
-  {
-    blockId: 'legal',   label: 'AI Юрист',    color: '#f87171', status: 'locked', actions: [],
-  },
-  {
-    blockId: 'sales',   label: 'AI Продажи',  color: '#818cf8', status: 'locked', actions: [],
-  },
-];
-
 // ─── Специальный сайдбар для Atlas ──────────────────────────────────────────
 function AtlasSubNav() {
   const pathname = usePathname();
   const router   = useRouter();
+  const [expanded, setExpanded] = useState<string[]>([]);
 
-  const goAtlas = (q: string) => {
-    router.push(`/atlas?q=${encodeURIComponent(q)}`);
-  };
+  const goAtlas = (q: string) => router.push(`/atlas?q=${encodeURIComponent(q)}`);
+  const toggle  = (id: string) =>
+    setExpanded(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   return (
-    <div className="flex-1 overflow-y-auto py-2">
-      {/* Ссылка на чат */}
-      <div className="mb-1">
-        <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-          AI Atlas
-        </p>
+    <div className="flex-1 overflow-y-auto py-2 flex flex-col">
+      {/* Открыть чат */}
+      <div className="px-2 mb-1">
         <Link
           href="/atlas"
           className={cn(
-            'flex items-center gap-2.5 px-3 py-2 mx-1 rounded-[8px] transition-colors text-sm',
+            'flex items-center gap-2.5 px-3 py-2 rounded-[8px] transition-colors text-sm',
             pathname === '/atlas'
               ? 'bg-[#ede9ff] text-[#6b5fd4] font-medium'
               : 'text-[#374151] hover:bg-[#f4f3f8]'
           )}
         >
-          <Brain className="w-4 h-4 flex-shrink-0" style={{ color: pathname === '/atlas' ? '#6b5fd4' : undefined }} />
+          <Brain className="w-4 h-4 flex-shrink-0" style={{ color: pathname === '/atlas' ? '#6b5fd4' : '#9ca3af' }} />
           Открыть чат
         </Link>
       </div>
 
-      <div style={{ height: 1, background: '#f3f4f6', margin: '6px 12px' }} />
+      <div style={{ height: 1, background: '#f3f4f6', margin: '4px 12px 6px' }} />
 
-      {/* Быстрые действия по блокам */}
-      <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
-        Быстрые действия
+      {/* Сценарии по блокам — аккордеон */}
+      <p className="px-4 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#9ca3af]">
+        Сценарии
       </p>
 
-      {ATLAS_QUICK.map(group => {
-        const isLocked = group.status === 'locked';
-        return (
-          <div key={group.blockId} className="mx-3 mb-2">
-            {/* Заголовок группы */}
-            <div className="flex items-center gap-1.5 py-1.5">
-              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: group.color }} />
-              <span className="text-[11px] font-semibold" style={{ color: '#374151' }}>
-                {group.label}
-              </span>
-              {isLocked && (
-                <Lock style={{ width: 10, height: 10, color: '#9ca3af', marginLeft: 'auto' }} />
+      <div className="flex-1 px-2 space-y-0.5">
+        {BLOCKS.map(block => {
+          const Icon   = block.icon;
+          const isOpen = expanded.includes(block.id);
+          return (
+            <div key={block.id}>
+              <button
+                onClick={() => toggle(block.id)}
+                className="w-full flex items-center gap-2 px-2 py-2 rounded-[8px] hover:bg-[#f4f3f8] transition-colors"
+              >
+                <Icon style={{ width: 13, height: 13, color: block.color, flexShrink: 0 }} />
+                <span className="flex-1 text-[12px] font-medium text-left truncate" style={{ color: '#374151' }}>
+                  {block.label}
+                </span>
+                <ChevronDown style={{
+                  width: 11, height: 11, color: '#9ca3af', flexShrink: 0,
+                  transform: isOpen ? 'rotate(180deg)' : 'none',
+                  transition: 'transform 0.15s',
+                }} />
+              </button>
+              {isOpen && (
+                <div className="ml-1 mb-1 space-y-0.5">
+                  {block.scenarios.map(s => (
+                    <button
+                      key={s}
+                      onClick={() => goAtlas(s)}
+                      className="w-full flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-left hover:bg-[#f4f3f8] transition-colors"
+                    >
+                      <ChevronRight style={{ width: 9, height: 9, color: block.color, flexShrink: 0, marginTop: 1 }} />
+                      <span className="text-[11px] leading-tight truncate" style={{ color: '#6b7280' }}>{s}</span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-
-            {isLocked ? (
-              <p className="text-[10px] px-1 pb-1" style={{ color: '#c4c4c4' }}>
-                Не подключён
-              </p>
-            ) : (
-              <div className="space-y-0.5">
-                {group.actions.map(action => (
-                  <button
-                    key={action}
-                    onClick={() => goAtlas(action)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-[7px] text-left hover:bg-[#f4f3f8] transition-colors group"
-                  >
-                    <ChevronRight style={{ width: 10, height: 10, color: group.color, flexShrink: 0 }} />
-                    <span className="text-[11px] text-[#374151] truncate">{action}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
       <div style={{ height: 1, background: '#f3f4f6', margin: '6px 12px' }} />
 
-      {/* Сохранённые / кастомные */}
-      <div className="mx-3">
-        <div className="flex items-center justify-between py-1.5">
+      {/* Сохранённые (неактивно) */}
+      <div className="px-3 pb-2">
+        <div className="flex items-center gap-2 opacity-40 cursor-not-allowed px-2 py-1.5">
+          <Plus style={{ width: 11, height: 11, color: '#9ca3af' }} />
           <span className="text-[11px] font-semibold" style={{ color: '#374151' }}>Сохранённые</span>
-          <button className="w-5 h-5 flex items-center justify-center rounded hover:bg-[#f4f3f8] transition-colors" title="Добавить">
-            <Plus style={{ width: 11, height: 11, color: '#9ca3af' }} />
-          </button>
         </div>
-        <p className="text-[10px] px-1" style={{ color: '#c4c4c4' }}>
+        <p className="text-[10px] px-2" style={{ color: '#c4c4c4' }}>
           Сохраняйте часто используемые задачи
         </p>
       </div>
