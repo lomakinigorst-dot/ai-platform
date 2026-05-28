@@ -123,7 +123,7 @@ type AtlasMessage = {
   role: 'user' | 'atlas';
   text: string;
   ts: string;
-  attachment?: { name: string; type: string };
+  attachment?: { name: string; type: string; base64?: string };
   actionSteps?: ActionStep[];
   confirmRequired?: boolean;
   confirmText?: string;
@@ -389,7 +389,7 @@ function RenameInput({ value, onDone }: { value: string; onDone: (v: string) => 
 // ─── File attachment popup ────────────────────────────────────────────────────
 
 function FileMenu({ onFile, onClose }: {
-  onFile: (file: File) => void;
+  onFile: (file: File, base64?: string) => void;
   onClose: () => void;
 }) {
   const imgRef  = useRef<HTMLInputElement>(null);
@@ -407,7 +407,20 @@ function FileMenu({ onFile, onClose }: {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) { onFile(f); onClose(); }
+    if (!f) return;
+    if (f.type.startsWith('image/') || f.type.startsWith('text/') || f.type === 'application/pdf') {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // strip data:...;base64, prefix
+        const base64 = result.includes(',') ? result.split(',')[1] : result;
+        onFile(f, base64);
+      };
+      reader.readAsDataURL(f);
+    } else {
+      onFile(f);
+    }
+    onClose();
   };
 
   return (
@@ -438,12 +451,12 @@ function FileMenu({ onFile, onClose }: {
 // ─── Input bar ────────────────────────────────────────────────────────────────
 
 function InputBar({ onSend, disabled, placeholder = 'Напишите сообщение... (Enter — отправить)' }: {
-  onSend: (text: string, attachment?: { name: string; type: string }) => void;
+  onSend: (text: string, attachment?: { name: string; type: string; base64?: string }) => void;
   disabled?: boolean;
   placeholder?: string;
 }) {
   const [input,    setInput]    = useState('');
-  const [attach,   setAttach]   = useState<{ name: string; type: string } | null>(null);
+  const [attach,   setAttach]   = useState<{ name: string; type: string; base64?: string } | null>(null);
   const [fileMenu, setFileMenu] = useState(false);
   const [listening, setListening] = useState(false);
   const inputRef   = useRef<HTMLTextAreaElement>(null);
@@ -516,7 +529,7 @@ function InputBar({ onSend, disabled, placeholder = 'Напишите сообщ
           </button>
           {fileMenu && (
             <FileMenu
-              onFile={f => setAttach({ name: f.name, type: f.type })}
+              onFile={(f, base64) => setAttach({ name: f.name, type: f.type, base64 })}
               onClose={() => setFileMenu(false)}
             />
           )}
@@ -827,8 +840,16 @@ function AtlasPageInner() {
     try {
       const chat = chats.find(c => c.id === cid);
       const apiMessages = (chat?.messages ?? [])
-        .map(m => ({ role: m.role === 'atlas' ? 'assistant' : 'user', content: m.text }));
-      if (text) apiMessages.push({ role: 'user', content: text });
+        .map(m => ({ role: m.role === 'atlas' ? 'assistant' : 'user', content: m.text, imageData: undefined as string | undefined }));
+      // Current message: attach image if present
+      const currentMsg: { role: string; content: string; imageData?: string } = {
+        role: 'user',
+        content: text,
+      };
+      if (attachment?.base64 && attachment.type.startsWith('image/')) {
+        currentMsg.imageData = `data:${attachment.type};base64,${attachment.base64}`;
+      }
+      if (text || attachment) apiMessages.push(currentMsg);
 
       const apiBase = typeof window !== 'undefined' ? '' : 'http://localhost:8000';
       const resp = await fetch(`${apiBase}/api/v1/atlas/chat`, {
