@@ -8,11 +8,13 @@ class Settings(BaseSettings):
     DEEPSEEK_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""      # только для эмбеддингов (text-embedding-3-small)
-    OPENROUTER_API_KEY: str = ""  # не используется, оставлен для совместимости
+    OPENROUTER_API_KEY: str = ""  # используется для vision (Gemini Flash)
     FIRECRAWL_API_KEY: str = ""
 
-    # DeepSeek прямой API — диалоги, быстро и дёшево
-    MODEL_DIALOG: str = "deepseek-chat"
+    # DeepSeek прямой API — основная модель для всех диалогов
+    MODEL_DIALOG: str = "deepseek-v4-flash"
+    # OpenRouter — vision extraction (изображения, аудио, видео)
+    MODEL_VISION: str = "google/gemini-flash-1.5"
     # Anthropic прямой API — маркетинг-анализ, ДНК, тексты, качество
     MODEL_ANALYSIS: str = "claude-sonnet-4-6"
 

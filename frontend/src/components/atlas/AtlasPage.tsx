@@ -124,6 +124,8 @@ type AtlasMessage = {
   text: string;
   ts: string;
   attachment?: { name: string; type: string; base64?: string };
+  visionStep?: string;
+  thinking?: string;
   actionSteps?: ActionStep[];
   confirmRequired?: boolean;
   confirmText?: string;
@@ -251,6 +253,60 @@ function MarkdownMessage({ text, isUser }: { text: string; isUser: boolean }) {
       >
         {text}
       </ReactMarkdown>
+    </div>
+  );
+}
+
+// ─── Thinking / Vision blocks ─────────────────────────────────────────────────
+
+function ThinkingBlock({ label, icon, text, color = '#9ca3af', streaming = false }: {
+  label: string;
+  icon: string;
+  text: string;
+  color?: string;
+  streaming?: boolean;
+}) {
+  const [open, setOpen] = useState(true);
+
+  // Auto-collapse when streaming stops and text is complete
+  useEffect(() => {
+    if (!streaming && text) {
+      const t = setTimeout(() => setOpen(false), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [streaming, text]);
+
+  return (
+    <div className="rounded-xl mb-2 overflow-hidden" style={{ border: '1px solid #f0f0f5', background: '#fafafa' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left"
+        style={{ background: 'transparent' }}
+      >
+        <span className="text-sm">{icon}</span>
+        <span className="flex-1 text-xs font-medium" style={{ color }}>
+          {label}
+          {streaming && !text && (
+            <span className="inline-flex gap-0.5 ml-2">
+              {[0,1,2].map(n => (
+                <span key={n} className="inline-block w-1 h-1 rounded-full animate-bounce"
+                  style={{ background: color, animationDelay: `${n * 0.15}s` }} />
+              ))}
+            </span>
+          )}
+        </span>
+        <span className="text-[10px]" style={{ color: '#d1d5db' }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && text && (
+        <div className="px-3 pb-3">
+          <div className="text-xs leading-relaxed whitespace-pre-wrap italic" style={{ color: '#9ca3af' }}>
+            {text}
+            {streaming && (
+              <span className="inline-block w-1.5 h-3.5 ml-0.5 animate-pulse rounded-sm" style={{ background: '#d1d5db', verticalAlign: 'text-bottom' }} />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -888,6 +944,24 @@ function AtlasPageInner() {
                 ),
               } : c));
             }
+            if (data.thinking) {
+              setChats(prev => prev.map(c => c.id === cid ? {
+                ...c, messages: c.messages.map((m, i) =>
+                  i === c.messages.length - 1
+                    ? { ...m, thinking: (m.thinking ?? '') + data.thinking }
+                    : m
+                ),
+              } : c));
+            }
+            if (data.vision) {
+              setChats(prev => prev.map(c => c.id === cid ? {
+                ...c, messages: c.messages.map((m, i) =>
+                  i === c.messages.length - 1
+                    ? { ...m, visionStep: (m.visionStep ?? '') + data.vision }
+                    : m
+                ),
+              } : c));
+            }
           } catch { /* ignore */ }
         }
       }
@@ -1241,6 +1315,26 @@ function AtlasPageInner() {
                 style={{ background: '#ede9ff', color: '#6b5fd4' }}>Вы</div>
             )}
             <div className="max-w-[72%]">
+              {/* Vision step block */}
+              {msg.visionStep !== undefined && (
+                <ThinkingBlock
+                  label="Анализирую вложение..."
+                  icon="🔍"
+                  text={msg.visionStep}
+                  color="#6b7280"
+                  streaming={loading && i === activeChat.messages.length - 1 && !msg.text}
+                />
+              )}
+              {/* Thinking block */}
+              {msg.thinking !== undefined && (
+                <ThinkingBlock
+                  label="Рассуждаю..."
+                  icon="💭"
+                  text={msg.thinking}
+                  color="#9ca3af"
+                  streaming={loading && i === activeChat.messages.length - 1 && !!msg.thinking && !msg.text}
+                />
+              )}
               <div className="px-4 py-2.5"
                 style={{
                   background: msg.role === 'atlas' ? '#fff' : '#6b5fd4',
@@ -1305,7 +1399,7 @@ function AtlasPageInner() {
           </div>
         ))}
 
-        {loading && (
+        {loading && !activeChat.messages.at(-1)?.visionStep && !activeChat.messages.at(-1)?.thinking && !activeChat.messages.at(-1)?.text && (
           <div className="flex gap-3">
             <div className="w-7 h-7 rounded-full flex items-center justify-center"
               style={{ background: 'rgba(167,139,250,0.15)' }}>

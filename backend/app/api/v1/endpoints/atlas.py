@@ -1,14 +1,12 @@
 import json
-import httpx
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.database import get_db
 from app.models import KnowledgeItem
-from app.services.ai import stream_chat
+from app.services.ai import extract_vision, stream_chat_thinking
 from app.services.embeddings import get_embedding
 
 router = APIRouter(prefix="/atlas", tags=["atlas"])
@@ -21,6 +19,7 @@ ATLAS_SYSTEM = """Ты AI Atlas — опытный бизнес-советник
 - Пишешь тексты, коммерческие предложения, скрипты, договоры
 - Анализируешь финансовые отчёты, делаешь прогнозы, считаешь метрики
 - Консультируешь по бизнес-стратегии и управлению
+- Анализируешь изображения, документы, схемы, фотографии
 
 ВАЖНО: Никогда не говори «я не занимаюсь этим» или «обратитесь к специалисту». Отвечай как эксперт по любому деловому или финансовому вопросу.
 
@@ -42,7 +41,7 @@ ATLAS_SYSTEM = """Ты AI Atlas — опытный бизнес-советник
 class AtlasMessage(BaseModel):
     role: str
     content: str
-    imageData: str | None = None  # data:image/...;base64,... for vision
+    imageData: str | None = None  # data:image/...;base64,... для vision
 
 
 class AtlasRequest(BaseModel):
@@ -54,70 +53,54 @@ class AtlasKBCreate(BaseModel):
     content: str
 
 
-async def _stream_vision(messages: list[dict]):
-    """Стриминг через OpenRouter с vision-моделью (Google Gemini Flash)."""
-    async with httpx.AsyncClient(timeout=60) as client:
-        async with client.stream(
-            "POST",
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "google/gemini-flash-1.5",
-                "messages": messages,
-                "stream": True,
-                "max_tokens": 2000,
-            },
-        ) as resp:
-            async for line in resp.aiter_lines():
-                if not line.startswith("data: "):
-                    continue
-                data = line[6:]
-                if data == "[DONE]":
-                    break
-                try:
-                    chunk = json.loads(data)
-                    delta = chunk["choices"][0]["delta"].get("content", "")
-                    if delta:
-                        yield delta
-                except Exception:
-                    continue
-
-
 @router.post("/chat")
 async def atlas_chat(body: AtlasRequest):
-    # Check if any message has an image
-    has_image = any(m.imageData for m in body.messages)
-
-    system_msg = {"role": "system", "content": ATLAS_SYSTEM}
-    messages: list[dict] = [system_msg]
-
-    for m in body.messages[-20:]:
-        if m.imageData and m.role == "user":
-            # Vision message: multi-part content
-            messages.append({
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": m.imageData}},
-                    {"type": "text", "text": m.content or "Что на этом изображении? Опиши подробно."},
-                ],
-            })
-        else:
-            messages.append({"role": m.role, "content": m.content})
+    # Последнее сообщение пользователя с вложением
+    last_user = next(
+        (m for m in reversed(body.messages) if m.role == "user"),
+        None,
+    )
+    has_attachment = last_user is not None and last_user.imageData is not None
 
     async def generate():
-        try:
-            if has_image:
-                async for chunk in _stream_vision(messages):
-                    yield f"data: {json.dumps({'text': chunk}, ensure_ascii=False)}\n\n"
+        vision_description: str | None = None
+
+        # ── Шаг 1: Vision extraction (если есть файл) ───────────────────────
+        if has_attachment and last_user and last_user.imageData:
+            try:
+                yield f"data: {json.dumps({'vision_start': True}, ensure_ascii=False)}\n\n"
+                description = await extract_vision(
+                    last_user.imageData,
+                    last_user.content or "",
+                )
+                vision_description = description
+                # Стримим описание чанками (имитация потока)
+                words = description.split()
+                chunk_size = 6
+                for i in range(0, len(words), chunk_size):
+                    chunk = " ".join(words[i:i + chunk_size]) + (" " if i + chunk_size < len(words) else "")
+                    yield f"data: {json.dumps({'vision': chunk}, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'vision': f'Не удалось проанализировать файл: {e}'}, ensure_ascii=False)}\n\n"
+
+        # ── Шаг 2: DeepSeek V4 Flash с thinking mode ────────────────────────
+        messages: list[dict] = [{"role": "system", "content": ATLAS_SYSTEM}]
+
+        for m in body.messages[-20:]:
+            if m.role == "user" and m.imageData and vision_description:
+                # Для последнего сообщения с вложением — добавляем описание
+                combined = f"[Вложение проанализировано]\n{vision_description}\n\n{m.content or ''}".strip()
+                messages.append({"role": "user", "content": combined})
             else:
-                async for chunk in stream_chat(messages):
-                    yield f"data: {json.dumps({'text': chunk}, ensure_ascii=False)}\n\n"
+                messages.append({"role": m.role, "content": m.content})
+
+        try:
+            async for event_type, chunk in stream_chat_thinking(messages):
+                yield f"data: {json.dumps({event_type: chunk}, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
             return
+
         yield f"data: {json.dumps({'done': True})}\n\n"
 
     return StreamingResponse(
@@ -129,7 +112,7 @@ async def atlas_chat(body: AtlasRequest):
 
 @router.post("/knowledge")
 async def atlas_save_knowledge(body: AtlasKBCreate, db: AsyncSession = Depends(get_db)):
-    """Сохранить ответ Atlas в глобальную базу знаний (доступно всем агентам через RAG)."""
+    """Сохранить ответ Atlas в глобальную базу знаний."""
     embedding = await get_embedding(body.content)
     item = KnowledgeItem(
         client_id=None,
