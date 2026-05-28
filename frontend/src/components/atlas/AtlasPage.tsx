@@ -8,7 +8,7 @@ import {
   Bot, UserCheck, TrendingUp, Users, DollarSign, Scale, BarChart3,
   Check, X, AlertCircle, ChevronDown, ChevronUp, Search,
   MoreHorizontal, Pencil, FolderOpen, Trash2, Image, FileText,
-  Camera, MessageSquare,
+  Camera, MessageSquare, Copy, BookOpen,
 } from 'lucide-react';
 
 // ─── Scenarios per block ─────────────────────────────────────────────────────
@@ -444,7 +444,10 @@ function InputBar({ onSend, disabled, placeholder = 'Напишите сообщ
 
   const toggleMic = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) { alert('Микрофон не поддерживается в этом браузере'); return; }
+    if (!SpeechRecognition || location.protocol !== 'https:') {
+      alert('Микрофон требует HTTPS-соединения. После получения SSL-сертификата функция заработает автоматически.');
+      return;
+    }
     if (listening) {
       recogRef.current?.stop();
       setListening(false);
@@ -466,7 +469,7 @@ function InputBar({ onSend, disabled, placeholder = 'Напишите сообщ
   };
 
   return (
-    <div className="flex flex-col rounded-xl overflow-hidden"
+    <div className="flex flex-col rounded-xl"
       style={{ background: '#f9f8ff', border: '1.5px solid #e9e8f0' }}>
       {attach && (
         <div className="flex items-center gap-2 px-4 pt-2 pb-1">
@@ -864,7 +867,7 @@ function AtlasPageInner() {
 
   // ── Sidebar ───────────────────────────────────────────────────────────────────
   const sidebar = (
-    <div className="flex flex-col flex-shrink-0 border-r overflow-hidden"
+    <div className="flex flex-col flex-shrink-0 border-r"
       style={{ width: 260, background: '#fff', borderColor: '#e5e7eb' }}>
 
       {/* Search */}
@@ -1110,21 +1113,31 @@ function AtlasPageInner() {
     </div>
   );
 
+  const activeChatFolder = activeChat?.folderId
+    ? folders.find(f => f.id === activeChat.folderId) ?? null
+    : null;
+
   // ── Chat view ──────────────────────────────────────────────────────────────────
   const chatView = activeChat && (
     <>
       <div className="flex-shrink-0 flex items-center justify-between px-5 h-11"
         style={{ borderBottom: '1px solid #e5e7eb', background: '#fff' }}>
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-xs flex-shrink-0" style={{ color: '#9ca3af' }}>AI Atlas</span>
-          <ChevronRight style={{ width: 12, height: 12, color: '#9ca3af', flexShrink: 0 }} />
+          {activeChatFolder && (
+            <>
+              <ChevronRight style={{ width: 11, height: 11, color: '#d1d5db', flexShrink: 0 }} />
+              <span className="text-xs flex-shrink-0" style={{ color: '#9ca3af' }}>{activeChatFolder.name}</span>
+            </>
+          )}
+          <ChevronRight style={{ width: 11, height: 11, color: '#d1d5db', flexShrink: 0 }} />
           <span className="text-xs font-medium truncate" style={{ color: '#374151' }}>{activeChat.title}</span>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4" style={{ background: '#f9f8ff' }}>
         {activeChat.messages.map((msg, i) => (
-          <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+          <div key={i} className={`group flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {msg.role === 'atlas' ? (
               <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
                 style={{ background: 'rgba(167,139,250,0.15)' }}>
@@ -1174,6 +1187,27 @@ function AtlasPageInner() {
                   ))}
                 </div>
               )}
+              {/* Message actions */}
+              <div className={`flex items-center gap-1.5 mt-1 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity select-none"
+                  style={{ color: '#9ca3af' }}>
+                  {formatTime(msg.ts)}
+                </span>
+                <button
+                  onClick={() => navigator.clipboard?.writeText(msg.text).catch(() => {})}
+                  className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-100"
+                  title="Копировать">
+                  <Copy style={{ width: 11, height: 11, color: '#9ca3af' }} />
+                </button>
+                {msg.role === 'atlas' && (
+                  <button
+                    className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-100"
+                    title="Добавить в базу знаний"
+                    onClick={() => alert('Скоро: добавление в базу знаний агента')}>
+                    <BookOpen style={{ width: 11, height: 11, color: '#9ca3af' }} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -1197,11 +1231,14 @@ function AtlasPageInner() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex-shrink-0 px-5 py-3" style={{ background: '#fff', borderTop: '1px solid #e5e7eb' }}>
+      <div className="flex-shrink-0 px-5 pt-3 pb-2" style={{ background: '#fff', borderTop: '1px solid #e5e7eb' }}>
         <InputBar
           onSend={(text, att) => sendMessage(text, activeChatId!, att)}
           disabled={loading}
         />
+        <p className="text-center text-[10px] mt-2" style={{ color: '#d1d5db' }}>
+          LLM-модели могут допускать ошибки. Проверяйте важную информацию.
+        </p>
       </div>
     </>
   );
