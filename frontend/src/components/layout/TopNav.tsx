@@ -106,13 +106,14 @@ export default function TopNav() {
               ))}
             </div>
             <div style={{ height: 1, background: '#f3f4f6', margin: '10px 0' }} />
-            <button
-              className="w-full py-1.5 rounded-[7px] text-xs font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ background: '#6b5fd4' }}
-              onClick={() => alert('Пополнение баланса — скоро!')}
+            <a
+              href="/billing"
+              className="block w-full py-1.5 rounded-[7px] text-xs font-semibold text-center transition-opacity hover:opacity-90"
+              style={{ background: '#6b5fd4', color: '#fff' }}
+              onClick={() => setBalanceOpen(false)}
             >
-              Пополнить баланс
-            </button>
+              Подробнее
+            </a>
           </div>
         )}
       </div>

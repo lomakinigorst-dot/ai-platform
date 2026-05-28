@@ -8,23 +8,27 @@ import TopNav from './TopNav';
 
 // Маппинг URL-путей на активный AI-блок
 const PATH_TO_BLOCK: Array<{ prefix: string; blockId: string }> = [
-  { prefix: '/atlas',        blockId: 'atlas' },
-  { prefix: '/marketing',    blockId: 'marketer' },
-  { prefix: '/hr',           blockId: 'hr' },
-  { prefix: '/finance',      blockId: 'finance' },
-  { prefix: '/legal',        blockId: 'legal' },
-  { prefix: '/sales',        blockId: 'sales' },
-  // Страницы консультанта
-  { prefix: '/leads',        blockId: 'consultant' },
-  { prefix: '/conversations',blockId: 'consultant' },
-  { prefix: '/knowledge',    blockId: 'consultant' },
-  { prefix: '/settings',     blockId: 'consultant' },
-  // Atlas management pages
-  { prefix: '/clients',      blockId: 'atlas' },
-  { prefix: '/analytics',    blockId: 'atlas' },
-  { prefix: '/integrations', blockId: 'atlas' },
+  { prefix: '/atlas',         blockId: 'atlas' },
+  { prefix: '/marketing',     blockId: 'marketer' },
+  { prefix: '/hr',            blockId: 'hr' },
+  { prefix: '/finance',       blockId: 'finance' },
+  { prefix: '/legal',         blockId: 'legal' },
+  { prefix: '/sales',         blockId: 'sales' },
+  // Все страницы консультанта — sidebar не меняется при навигации внутри блока
+  { prefix: '/leads',         blockId: 'consultant' },
+  { prefix: '/conversations', blockId: 'consultant' },
+  { prefix: '/knowledge',     blockId: 'consultant' },
+  { prefix: '/settings',      blockId: 'consultant' },
+  { prefix: '/clients',       blockId: 'consultant' },
+  { prefix: '/analytics',     blockId: 'consultant' },
+  { prefix: '/scanner',       blockId: 'consultant' },
+  { prefix: '/team',          blockId: 'consultant' },
+  { prefix: '/support',       blockId: 'consultant' },
+  { prefix: '/billing',       blockId: 'consultant' },
+  { prefix: '/journey',       blockId: 'consultant' },
+  { prefix: '/integrations',  blockId: 'consultant' },
   // Дашборд — консультант
-  { prefix: '/',             blockId: 'consultant' },
+  { prefix: '/',              blockId: 'consultant' },
 ];
 
 function getActiveBlockId(pathname: string): string {

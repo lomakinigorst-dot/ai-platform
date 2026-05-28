@@ -399,7 +399,7 @@ export default function JourneyPage() {
         style={{ background: '#fff', borderColor: '#f0f0f5' }}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold" style={{ color: '#111827' }}>Journey Maps</h1>
+            <h1 className="text-xl font-bold" style={{ color: '#111827' }}>Путь клиента</h1>
             <p className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>
               Путь {mode === 'partner' ? 'партнёра (агентства)' : 'клиента'} по платформе — шаг за шагом
             </p>
@@ -460,7 +460,7 @@ export default function JourneyPage() {
             style={{ background: '#f3f4f6', border: '1px solid #e5e7eb' }}>
             <Lock style={{ width: 16, height: 16, color: '#9ca3af' }} />
             <p className="text-sm" style={{ color: '#6b7280' }}>
-              Journey Maps для AI HR, AI Финансы, AI Юрист и AI Продажи — доступны после подключения соответствующих блоков.
+              Путь клиента для AI HR, AI Финансы, AI Юрист и AI Продажи — доступен после подключения соответствующих блоков.
             </p>
           </div>
         </div>

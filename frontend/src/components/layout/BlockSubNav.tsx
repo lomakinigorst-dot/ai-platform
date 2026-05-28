@@ -19,16 +19,9 @@ const blockNavs: Record<string, NavSection[]> = {
   atlas: [
     {
       title: 'AI Atlas',
-      items: [{ label: 'AI Atlas', href: '/atlas', icon: Brain }],
-    },
-    {
-      title: 'Управление',
       items: [
-        { label: 'Дашборд',      href: '/',            icon: LayoutDashboard },
-        { label: 'Клиенты',      href: '/clients',     icon: Users },
-        { label: 'Аналитика',    href: '/analytics',   icon: BarChart3 },
-        { label: 'Journey Maps', href: '/journey',     icon: Map },
-        { label: 'Интеграции',   href: '/integrations',icon: Zap },
+        { label: 'Открыть чат',  href: '/atlas',        icon: Brain },
+        { label: 'Интеграции',   href: '/integrations', icon: Zap },
       ],
     },
   ],
@@ -46,12 +39,12 @@ const blockNavs: Record<string, NavSection[]> = {
     {
       title: 'Управление',
       items: [
-        { label: 'AI Сканер',     href: '/scanner',  icon: ScanLine },
-        { label: 'Команда',       href: '/team',     icon: UserCog },
-        { label: 'Финансы',       href: '/finance',  icon: CreditCard },
-        { label: 'Journey Maps',  href: '/journey',  icon: Map },
-        { label: 'Настройки',     href: '/settings', icon: Settings },
-        { label: 'Поддержка',     href: '/support',  icon: HelpCircle },
+        { label: 'AI Сканер',         href: '/scanner',  icon: ScanLine },
+        { label: 'Команда',           href: '/team',     icon: UserCog },
+        { label: 'Баланс и тариф',    href: '/billing',  icon: CreditCard },
+        { label: 'Путь клиента',      href: '/journey',  icon: Map },
+        { label: 'Настройки агентства', href: '/settings', icon: Settings },
+        { label: 'Поддержка',         href: '/support',  icon: HelpCircle },
       ],
     },
   ],
