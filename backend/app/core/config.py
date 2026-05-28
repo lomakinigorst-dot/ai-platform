@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     # DeepSeek прямой API — основная модель для всех диалогов
     MODEL_DIALOG: str = "deepseek-v4-flash"
     # OpenRouter — vision extraction (изображения, аудио, видео)
-    MODEL_VISION: str = "google/gemini-flash-1.5"
+    MODEL_VISION: str = "openai/gpt-4o-mini"
     # Anthropic прямой API — маркетинг-анализ, ДНК, тексты, качество
     MODEL_ANALYSIS: str = "claude-sonnet-4-6"
 

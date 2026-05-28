@@ -33,6 +33,8 @@ async def extract_vision(image_data_url: str, user_prompt: str = "") -> str:
             headers={
                 "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
                 "Content-Type": "application/json",
+                "HTTP-Referer": "https://ai.lomakin-igor.ru",
+                "X-Title": "AI Atlas Platform",
             },
             json={
                 "model": settings.MODEL_VISION,

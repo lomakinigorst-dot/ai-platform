@@ -222,8 +222,9 @@ export default function AIRail({ expanded, onToggle, activeBlock, onBlockSelect 
               onMouseEnter={() => !expanded && setHoveredBlock(block.id)}
               onMouseLeave={() => setHoveredBlock(null)}
             >
-              <button
-                onClick={() => onBlockSelect(block.id)}
+              <a
+                href={block.homeHref}
+                onClick={(e) => { e.preventDefault(); onBlockSelect(block.id); }}
                 title={!expanded ? block.label : undefined}
                 className="flex items-center transition-all w-full"
                 style={{
@@ -237,6 +238,7 @@ export default function AIRail({ expanded, onToggle, activeBlock, onBlockSelect 
                     : 'transparent',
                   borderRadius: 8,
                   opacity: isLocked && !isHovered && !expanded ? 0.5 : 1,
+                  textDecoration: 'none',
                 }}
               >
                 {/* Активная полоска слева */}
@@ -309,11 +311,12 @@ export default function AIRail({ expanded, onToggle, activeBlock, onBlockSelect 
                     </span>
                   </div>
                 )}
-              </button>
+              </a>
 
               {/* Ховер-попап для свёрнутого рейла */}
               {!expanded && isHovered && (
-                <div
+                <a
+                  href={block.homeHref}
                   className="absolute flex items-center gap-2.5 rounded-[10px] z-50 cursor-pointer"
                   style={{
                     left: 'calc(100% + 8px)',
@@ -325,8 +328,9 @@ export default function AIRail({ expanded, onToggle, activeBlock, onBlockSelect 
                     padding: '7px 12px 7px 10px',
                     whiteSpace: 'nowrap',
                     animation: 'slideInLeft 0.12s ease-out',
+                    textDecoration: 'none',
                   }}
-                  onClick={() => onBlockSelect(block.id)}
+                  onClick={(e) => { e.preventDefault(); onBlockSelect(block.id); }}
                   onMouseEnter={() => setHoveredBlock(block.id)}
                   onMouseLeave={() => setHoveredBlock(null)}
                 >
@@ -352,7 +356,7 @@ export default function AIRail({ expanded, onToggle, activeBlock, onBlockSelect 
                       Скоро
                     </span>
                   )}
-                </div>
+                </a>
               )}
             </div>
           );

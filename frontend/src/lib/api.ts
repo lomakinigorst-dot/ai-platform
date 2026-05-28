@@ -186,7 +186,7 @@ export const knowledgeApi = {
   delete: (clientId: string, itemId: string) =>
     api.delete(`/knowledge/clients/${clientId}/items/${itemId}`).then(r => r.data),
 
-  create: (clientId: string, data: { title: string; content: string }) =>
+  create: (clientId: string, data: { title: string; content: string; folder?: string }) =>
     api.post(`/knowledge/clients/${clientId}/items`, data).then(r => r.data),
 };
 

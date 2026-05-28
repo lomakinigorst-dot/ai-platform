@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect, Suspense, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Brain, Send, Plus, FolderPlus, ChevronRight, Paperclip, Mic, MicOff,
   Bot, UserCheck, TrendingUp, Users, DollarSign, Scale, BarChart3,
@@ -238,6 +240,7 @@ function MarkdownMessage({ text, isUser }: { text: string; isUser: boolean }) {
         '--tw-prose-links': '#6b5fd4',
       } as React.CSSProperties}>
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         components={{
           p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
           ul: ({ children }) => <ul className="mb-2 pl-4 list-disc space-y-0.5">{children}</ul>,
@@ -249,6 +252,16 @@ function MarkdownMessage({ text, isUser }: { text: string; isUser: boolean }) {
           h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 mt-1">{children}</h3>,
           code: ({ children }) => <code className="px-1 py-0.5 rounded text-xs font-mono" style={{ background: '#f3f4f6', color: '#6b5fd4' }}>{children}</code>,
           blockquote: ({ children }) => <blockquote className="border-l-2 pl-3 my-1 italic" style={{ borderColor: '#e5e7eb', color: '#6b7280' }}>{children}</blockquote>,
+          table: ({ children }) => (
+            <div className="overflow-x-auto my-3 rounded-xl" style={{ border: '1px solid #e5e7eb', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              <table className="min-w-full border-collapse text-xs">{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => <thead style={{ background: '#f4f3f8' }}>{children}</thead>,
+          tbody: ({ children }) => <tbody>{children}</tbody>,
+          tr: ({ children }) => <tr className="border-b last:border-b-0" style={{ borderColor: '#f0f0f5' }}>{children}</tr>,
+          th: ({ children }) => <th className="px-3 py-2 text-left font-semibold text-xs" style={{ color: '#374151', borderRight: '1px solid #f0f0f5' }}>{children}</th>,
+          td: ({ children }) => <td className="px-3 py-2 text-xs" style={{ color: '#374151', borderRight: '1px solid #f0f0f5' }}>{children}</td>,
         }}
       >
         {text}
@@ -267,42 +280,68 @@ function ThinkingBlock({ label, icon, text, color = '#9ca3af', streaming = false
   streaming?: boolean;
 }) {
   const [open, setOpen] = useState(true);
+  const [elapsed, setElapsed] = useState(0);
 
-  // Auto-collapse when streaming stops and text is complete
+  // Timer while streaming
+  useEffect(() => {
+    if (!streaming) return;
+    const t = setInterval(() => setElapsed(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [streaming]);
+
+  // Auto-collapse 1.5s after stream ends
   useEffect(() => {
     if (!streaming && text) {
-      const t = setTimeout(() => setOpen(false), 1200);
+      const t = setTimeout(() => setOpen(false), 1500);
       return () => clearTimeout(t);
     }
   }, [streaming, text]);
 
   return (
-    <div className="rounded-xl mb-2 overflow-hidden" style={{ border: '1px solid #f0f0f5', background: '#fafafa' }}>
+    <div className="mb-2 rounded-xl overflow-hidden" style={{ border: '1px solid #ede9ff', background: '#f9f8ff' }}>
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-2 px-3 py-2 text-left"
-        style={{ background: 'transparent' }}
       >
-        <span className="text-sm">{icon}</span>
-        <span className="flex-1 text-xs font-medium" style={{ color }}>
+        {/* Spinner or static icon */}
+        {streaming ? (
+          <div className="w-3.5 h-3.5 rounded-full border-2 flex-shrink-0" style={{
+            borderColor: '#c4b5fd',
+            borderTopColor: '#7c3aed',
+            animation: 'spin 0.7s linear infinite',
+          }} />
+        ) : (
+          <span className="text-xs flex-shrink-0">{icon}</span>
+        )}
+        <span className="flex-1 text-xs font-medium" style={{ color: '#6b5fd4' }}>
           {label}
-          {streaming && !text && (
-            <span className="inline-flex gap-0.5 ml-2">
-              {[0,1,2].map(n => (
-                <span key={n} className="inline-block w-1 h-1 rounded-full animate-bounce"
-                  style={{ background: color, animationDelay: `${n * 0.15}s` }} />
-              ))}
-            </span>
-          )}
         </span>
-        <span className="text-[10px]" style={{ color: '#d1d5db' }}>{open ? '▲' : '▼'}</span>
+        {streaming && elapsed > 0 && (
+          <span className="text-[10px] flex-shrink-0" style={{ color: '#a78bfa' }}>{elapsed}с</span>
+        )}
+        <ChevronDown style={{
+          width: 11, height: 11, color: '#c4b5fd', flexShrink: 0,
+          transform: open ? 'rotate(180deg)' : 'none',
+          transition: 'transform 0.15s',
+        }} />
       </button>
-      {open && text && (
-        <div className="px-3 pb-3">
-          <div className="text-xs leading-relaxed whitespace-pre-wrap italic" style={{ color: '#9ca3af' }}>
+      {open && (
+        <div className="px-3 pb-2.5" style={{ maxHeight: 96, overflowY: 'auto' }}>
+          <div className="text-[11px] leading-relaxed italic" style={{ color: '#9ca3af' }}>
             {text}
             {streaming && (
-              <span className="inline-block w-1.5 h-3.5 ml-0.5 animate-pulse rounded-sm" style={{ background: '#d1d5db', verticalAlign: 'text-bottom' }} />
+              <span className="inline-block w-1 h-3 ml-0.5 align-middle" style={{
+                background: '#c4b5fd',
+                animation: 'pulse 1s ease-in-out infinite',
+              }} />
+            )}
+            {!text && streaming && (
+              <span className="flex gap-1">
+                {[0,1,2].map(n => (
+                  <span key={n} className="inline-block w-1.5 h-1.5 rounded-full"
+                    style={{ background: '#c4b5fd', animation: `bounce 1.2s ease-in-out ${n * 0.2}s infinite` }} />
+                ))}
+              </span>
             )}
           </div>
         </div>
@@ -377,11 +416,12 @@ function ActionChain({ steps, onConfirm, onSkip }: {
   );
 }
 
-// ─── 3-dot context menu ───────────────────────────────────────────────────────
+// ─── 3-dot context menu (Portal, fixed position) ─────────────────────────────
 
-function ContextMenu({ items, onClose }: {
+function ContextMenu({ items, onClose, pos }: {
   items: { label: string; icon: React.ElementType; danger?: boolean; sub?: { label: string; onClick: () => void }[]; onClick?: () => void }[];
   onClose: () => void;
+  pos: { x: number; y: number };
 }) {
   const [subOpen, setSubOpen] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -391,9 +431,20 @@ function ContextMenu({ items, onClose }: {
     return () => document.removeEventListener('mousedown', h);
   }, [onClose]);
 
-  return (
-    <div ref={ref} className="absolute z-50 right-0 top-full mt-0.5 rounded-xl shadow-lg border py-1"
-      style={{ background: '#fff', borderColor: '#e5e7eb', minWidth: 160 }}>
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div ref={ref}
+      className="fixed z-[9999] rounded-xl shadow-xl border py-1"
+      style={{
+        background: '#fff',
+        borderColor: '#e5e7eb',
+        minWidth: 168,
+        left: pos.x,
+        top: pos.y + 4,
+        transform: 'translateX(-100%)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+      }}>
       {items.map((item, i) => {
         const Icon = item.icon;
         return (
@@ -408,8 +459,13 @@ function ContextMenu({ items, onClose }: {
               {item.sub && <ChevronRight style={{ width: 11, height: 11, color: '#9ca3af' }} />}
             </button>
             {item.sub && subOpen === i && (
-              <div className="absolute left-full top-0 ml-0.5 rounded-xl shadow-lg border py-1"
-                style={{ background: '#fff', borderColor: '#e5e7eb', minWidth: 140 }}>
+              <div className="fixed z-[9999] rounded-xl shadow-xl border py-1"
+                style={{
+                  background: '#fff', borderColor: '#e5e7eb', minWidth: 150,
+                  left: pos.x - 168 - 6,
+                  top: pos.y + 4 + i * 36,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
+                }}>
                 {item.sub.map((s, j) => (
                   <button key={j} onClick={() => { s.onClick(); onClose(); }}
                     className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm truncate"
@@ -422,7 +478,8 @@ function ContextMenu({ items, onClose }: {
           </div>
         );
       })}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -628,6 +685,7 @@ function FolderView({ folder, chats, onOpenChat, onNewChat, onDeleteChat, onRena
   onMoveChat: (chatId: string, folderId: string | null) => void;
 }) {
   const [menuId, setMenuId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
   const folderChats = chats.filter(c => c.folderId === folder.id);
 
   return (
@@ -671,12 +729,13 @@ function FolderView({ folder, chats, onOpenChat, onNewChat, onDeleteChat, onRena
                 )}
               </div>
               <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                <button onClick={() => setMenuId(menuId === chat.id ? null : chat.id)}
+                <button onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setMenuPos({ x: r.right, y: r.bottom }); setMenuId(menuId === chat.id ? null : chat.id); }}
                   className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-gray-100">
                   <MoreHorizontal style={{ width: 13, height: 13, color: '#9ca3af' }} />
                 </button>
                 {menuId === chat.id && (
                   <ContextMenu
+                    pos={menuPos}
                     onClose={() => setMenuId(null)}
                     items={[
                       { label: 'Переименовать', icon: Pencil, onClick: () => { const t = prompt('Новое название', chat.title); if (t) onRenameChat(chat.id, t); } },
@@ -721,6 +780,7 @@ function AtlasPageInner() {
   const [loading,        setLoading]        = useState(false);
   const [search,         setSearch]         = useState('');
   const [menuId,         setMenuId]         = useState<string | null>(null);
+  const [menuPos,        setMenuPos]        = useState({ x: 0, y: 0 });
   const [renamingId,     setRenamingId]     = useState<string | null>(null);
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null);
   const [toast,          setToast]          = useState<string | null>(null);
@@ -734,7 +794,19 @@ function AtlasPageInner() {
   }, []);
 
   const copyText = useCallback((text: string) => {
-    navigator.clipboard?.writeText(text).catch(() => {});
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    } else {
+      // Fallback for HTTP
+      const el = document.createElement('textarea');
+      el.value = text;
+      el.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+      document.body.appendChild(el);
+      el.focus();
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
     showToast('Скопировано');
   }, [showToast]);
 
@@ -1033,7 +1105,7 @@ function AtlasPageInner() {
 
       {/* New chat + New folder */}
       <div className="px-3 pb-2 pt-1 flex gap-1.5">
-        <button onClick={() => createChat()}
+        <button onClick={() => { setActiveChatId(null); setActiveFolderId(null); }}
           className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-xs font-semibold text-white"
           style={{ background: '#6b5fd4' }}>
           <Plus style={{ width: 13, height: 13 }} /> Новый чат
@@ -1086,12 +1158,12 @@ function AtlasPageInner() {
                           <span className="text-[10px] ml-auto flex-shrink-0" style={{ color: '#9ca3af' }}>{folderChats.length}</span>
                         </button>
                         <div className="relative opacity-0 group-hover:opacity-100 flex-shrink-0">
-                          <button onClick={() => setMenuId(menuId === `f-${folder.id}` ? null : `f-${folder.id}`)}
+                          <button onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenuPos({ x: r.right, y: r.bottom }); setMenuId(menuId === `f-${folder.id}` ? null : `f-${folder.id}`); }}
                             className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200">
                             <MoreHorizontal style={{ width: 12, height: 12, color: '#9ca3af' }} />
                           </button>
                           {menuId === `f-${folder.id}` && (
-                            <ContextMenu onClose={() => setMenuId(null)} items={[
+                            <ContextMenu pos={menuPos} onClose={() => setMenuId(null)} items={[
                               { label: 'Переименовать', icon: Pencil, onClick: () => setRenamingFolder(folder.id) },
                               { label: 'Удалить', icon: Trash2, danger: true, onClick: () => deleteFolder(folder.id) },
                             ]} />
@@ -1127,12 +1199,12 @@ function AtlasPageInner() {
                                       <div className="text-[10px]" style={{ color: '#d1d5db' }}>{formatTime(chat.ts)}</div>
                                     </button>
                                     <div className="relative opacity-0 group-hover:opacity-100 flex-shrink-0">
-                                      <button onClick={() => setMenuId(menuId === chat.id ? null : chat.id)}
+                                      <button onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenuPos({ x: r.right, y: r.bottom }); setMenuId(menuId === chat.id ? null : chat.id); }}
                                         className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200">
                                         <MoreHorizontal style={{ width: 11, height: 11, color: '#9ca3af' }} />
                                       </button>
                                       {menuId === chat.id && (
-                                        <ContextMenu onClose={() => setMenuId(null)} items={[
+                                        <ContextMenu pos={menuPos} onClose={() => setMenuId(null)} items={[
                                           { label: 'Переименовать', icon: Pencil, onClick: () => setRenamingId(chat.id) },
                                           {
                                             label: 'В папку', icon: FolderOpen,
@@ -1191,12 +1263,12 @@ function AtlasPageInner() {
                             </div>
                           </button>
                           <div className="relative opacity-0 group-hover:opacity-100 flex-shrink-0 pr-1">
-                            <button onClick={() => setMenuId(menuId === chat.id ? null : chat.id)}
+                            <button onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenuPos({ x: r.right, y: r.bottom }); setMenuId(menuId === chat.id ? null : chat.id); }}
                               className="w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200">
                               <MoreHorizontal style={{ width: 11, height: 11, color: '#9ca3af' }} />
                             </button>
                             {menuId === chat.id && (
-                              <ContextMenu onClose={() => setMenuId(null)} items={[
+                              <ContextMenu pos={menuPos} onClose={() => setMenuId(null)} items={[
                                 { label: 'Переименовать', icon: Pencil, onClick: () => setRenamingId(chat.id) },
                                 {
                                   label: 'В папку', icon: FolderOpen,

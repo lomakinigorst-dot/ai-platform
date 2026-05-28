@@ -12,7 +12,7 @@ import {
   Briefcase, GitBranch, FileText, DollarSign, Calendar,
   Scale, History, TrendingUp, Phone, Dna, Lock, Zap, Brain,
   Plus, ChevronRight, ChevronDown, ScanLine, HelpCircle,
-  CreditCard, UserCog, Map,
+  CreditCard, UserCog, Map, Database,
 } from 'lucide-react';
 
 interface NavItem    { label: string; href: string; icon: React.ElementType; }
@@ -32,11 +32,12 @@ const blockNavs: Record<string, NavSection[]> = {
     {
       title: 'AI Консультант',
       items: [
-        { label: 'Дашборд',     href: '/',              icon: LayoutDashboard },
-        { label: 'Клиенты',     href: '/clients',       icon: Users },
-        { label: 'Мои лиды',    href: '/leads',         icon: UserCheck },
-        { label: 'Мои диалоги', href: '/conversations', icon: MessageSquare },
-        { label: 'Аналитика',   href: '/analytics',     icon: BarChart3 },
+        { label: 'Дашборд',      href: '/',              icon: LayoutDashboard },
+        { label: 'Клиенты',      href: '/clients',       icon: Users },
+        { label: 'Мои лиды',     href: '/leads',         icon: UserCheck },
+        { label: 'Мои диалоги',  href: '/conversations', icon: MessageSquare },
+        { label: 'База знаний',  href: '/knowledge',     icon: Database },
+        { label: 'Аналитика',    href: '/analytics',     icon: BarChart3 },
       ],
     },
     {
