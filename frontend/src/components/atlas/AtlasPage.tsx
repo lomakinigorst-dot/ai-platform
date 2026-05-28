@@ -839,17 +839,14 @@ function AtlasPageInner() {
     // SSE stream
     try {
       const chat = chats.find(c => c.id === cid);
-      const apiMessages = (chat?.messages ?? [])
-        .map(m => ({ role: m.role === 'atlas' ? 'assistant' : 'user', content: m.text, imageData: undefined as string | undefined }));
+      type ApiMsg = { role: string; content: string; imageData: string | undefined };
+      const apiMessages: ApiMsg[] = (chat?.messages ?? [])
+        .map(m => ({ role: m.role === 'atlas' ? 'assistant' : 'user', content: m.text, imageData: undefined }));
       // Current message: attach image if present
-      const currentMsg: { role: string; content: string; imageData?: string } = {
-        role: 'user',
-        content: text,
-      };
-      if (attachment?.base64 && attachment.type.startsWith('image/')) {
-        currentMsg.imageData = `data:${attachment.type};base64,${attachment.base64}`;
-      }
-      if (text || attachment) apiMessages.push(currentMsg);
+      const imageData = (attachment?.base64 && attachment.type.startsWith('image/'))
+        ? `data:${attachment.type};base64,${attachment.base64}`
+        : undefined;
+      if (text || attachment) apiMessages.push({ role: 'user', content: text, imageData });
 
       const apiBase = typeof window !== 'undefined' ? '' : 'http://localhost:8000';
       const resp = await fetch(`${apiBase}/api/v1/atlas/chat`, {
